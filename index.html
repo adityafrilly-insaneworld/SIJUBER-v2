@@ -1238,10 +1238,26 @@ body[data-role="operator"] #page-rab .btn-icon,
 body[data-role="operator"] #page-konfig .btn-primary,
 body[data-role="operator"] #page-konfig .btn-danger,
 body[data-role="operator"] #page-konfig .btn-outline{display:none!important}
-/* Bendahara: tidak bisa ubah RAB */
+/* Bendahara + Viewer: bisa lihat RAB, tidak bisa ubah */
 body[data-role="bendahara"] #page-rab .btn-primary,
 body[data-role="bendahara"] #page-rab .btn-danger,
-body[data-role="bendahara"] #page-rab .btn-icon{display:none!important}
+body[data-role="bendahara"] #page-rab .btn-icon,
+body[data-role="viewer"] #page-rab .btn-primary,
+body[data-role="viewer"] #page-rab .btn-danger,
+body[data-role="viewer"] #page-rab .btn-icon{display:none!important}
+/* Viewer: sembunyikan input penerimaan & setor kas */
+body[data-role="viewer"] #page-kas .btn-primary,
+body[data-role="viewer"] #page-kas .btn-outline{display:none!important}
+
+#topbar-logout-btn:hover{border-color:var(--danger)!important;color:var(--danger)!important;background:var(--danger-light)!important}
+
+/* Export PDF: hanya admin & bendahara */
+body[data-role="operator"] #btn-export-pdf,
+body[data-role="viewer"] #btn-export-pdf{display:none!important}
+
+/* Viewer: tidak bisa lihat Laporan Pajak */
+body[data-role="viewer"] .laporan-pajak-card{display:none!important}
+body[data-role="viewer"] #pdf-opt-pajak-wrap{display:none!important}
 </style>
 </head>
 <body>
@@ -1358,9 +1374,17 @@ body[data-role="bendahara"] #page-rab .btn-icon{display:none!important}
       </div>
       <span class="ta-badge" id="tb-badge">TA 2026</span>
       <span class="role-badge" id="topbar-role-badge" style="display:none"></span>
-      <button id="topbar-logout-btn" onclick="doLogout()" title="Keluar"
-        style="display:none;width:30px;height:30px;border-radius:8px;border:1.5px solid var(--border);
-        background:var(--surface2);cursor:pointer;font-size:13px;color:var(--text-2)">⏏</button>
+      <button id="topbar-logout-btn" onclick="doLogout()" title="Keluar dari SIJUBER"
+        style="display:none;width:32px;height:32px;border-radius:9px;border:1.5px solid var(--border);
+        background:var(--surface2);cursor:pointer;color:var(--text-2);
+        align-items:center;justify-content:center;transition:all .15s;padding:0">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+          stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+          <polyline points="16 17 21 12 16 7"/>
+          <line x1="21" y1="12" x2="9" y2="12"/>
+        </svg>
+      </button>
     </div>
   </div>
   <div class="content">
@@ -1714,10 +1738,24 @@ body[data-role="bendahara"] #page-rab .btn-icon{display:none!important}
   <div class="page" id="page-laporan">
     <div class="section-header">
       <div><div class="section-title">📊 Laporan Realisasi</div><div class="section-sub">Rekap anggaran, realisasi, pajak, dan sumber dana</div></div>
-      <button class="btn btn-primary allow-viewer" onclick="openPDFModal()">📄 Export PDF</button>
+      <button class="btn btn-primary" id="btn-export-pdf" onclick="openPDFModal()">📄 Export PDF</button>
     </div>
 
-    <!-- ① KARTU PER SUMBER DANA -->
+    <!-- ① KARTU SALDO KAS TUNAI -->
+    <div class="card" id="lap-kas-card">
+      <div class="card-title">🪙 Saldo Kas Tunai</div>
+      <div class="card-sub">Posisi saldo tunai per sumber dana saat ini</div>
+      <div class="stats-grid" id="lap-kas-stats" style="margin-bottom:0"></div>
+    </div>
+
+    <!-- ② REALISASI PER BIDANG -->
+    <div class="card">
+      <div class="card-title">🗂️ Realisasi per Bidang</div>
+      <div class="card-sub">Penyerapan anggaran 5 bidang APBDes</div>
+      <div class="bidang-cards" id="lap-bidang-cards"></div>
+    </div>
+
+    <!-- ③ KARTU PER SUMBER DANA -->
     <div class="card">
       <div class="card-title">💳 Realisasi per Sumber Dana</div>
       <div class="card-sub">Total anggaran, realisasi, sisa, dan persentase penyerapan per sumber pembiayaan</div>
@@ -1740,7 +1778,7 @@ body[data-role="bendahara"] #page-rab .btn-icon{display:none!important}
     </div>
 
     <!-- ③ LAPORAN PAJAK -->
-    <div class="card" style="padding-bottom:0">
+    <div class="card laporan-pajak-card" style="padding-bottom:0">
       <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:12px">
         <div>
           <div class="card-title">🧾 Laporan Pajak</div>
@@ -3697,7 +3735,59 @@ function hapusRAB(id){
 // ═══════════════════════════════════════════════
 let lapFilter='',lapPajakFilter='',lapPajakStatusFilter='semua';
 
+
+// ── Laporan: Saldo Kas per Sumber ──
+function renderLapKas(){
+  const grid=document.getElementById('lap-kas-stats');
+  if(!grid) return;
+  const sumbs=['DD','ADD','PAD','PBH','DLL'];
+  const totalM=db.kas.filter(k=>k.nominal>0).reduce((s,k)=>s+k.nominal,0);
+  const totalK=db.kas.filter(k=>k.nominal<0).reduce((s,k)=>s+Math.abs(k.nominal),0);
+  let html=`<div class="stat-card"><div class="stat-label">🪙 Total Saldo Tunai</div>
+    <div class="stat-value-big amber">${fmtS(totalM-totalK)}</div>
+    <div class="stat-value-sub">Masuk ${fmtS(totalM)} · Keluar ${fmtS(totalK)}</div></div>`;
+  sumbs.forEach(s=>{
+    const m=db.kas.filter(k=>k.nominal>0&&k.sumber===s).reduce((a,k)=>a+k.nominal,0);
+    const ke=db.kas.filter(k=>k.nominal<0&&k.sumber===s).reduce((a,k)=>a+Math.abs(k.nominal),0);
+    if(m===0&&ke===0) return;
+    html+=`<div class="stat-card"><div class="stat-label">Saldo ${s} ${sumberBadge(s)}</div>
+      <div class="stat-value-big" style="font-size:20px">${fmtS(m-ke)}</div>
+      <div class="stat-value-sub">Masuk ${fmtS(m)}</div></div>`;
+  });
+  grid.innerHTML=html;
+}
+
+// ── Laporan: Realisasi per Bidang ──
+function renderLapBidang(){
+  const bEl=document.getElementById('lap-bidang-cards');
+  if(!bEl) return;
+  bEl.innerHTML='';
+  db.bidang.forEach((b,i)=>{
+    const col=BIDANG_COLORS[i]||'#888';
+    const ang=db.rab.filter(r=>r.bidang===b.id).reduce((s,r)=>s+r.jumlah,0);
+    const real=db.realisasi.filter(r=>{const k=db.rab.find(x=>x.id===r.rabId);return k&&k.bidang===b.id;}).reduce((s,r)=>s+r.bruto,0);
+    const sisa=ang-real;
+    const p=ang>0?real/ang*100:0;
+    const isComplete=sisa===0&&real>0;
+    const dispPct=isComplete?'100.0':(Math.floor(p*10)/10).toFixed(1);
+    bEl.innerHTML+=`
+      <div class="bidang-card animate-in" style="border-top:3px solid ${col}">
+        <div class="bidang-num" style="background:${col}">${i+1}</div>
+        <div class="bidang-card-name">${b.nama}</div>
+        <div class="bidang-mini-pie">${miniPie(p,col,80,i*100)}</div>
+        <div class="bidang-stat-row"><span class="bidang-stat-label">Anggaran</span><span class="bidang-stat-val">${fmtS(ang)}</span></div>
+        <div class="bidang-stat-row"><span class="bidang-stat-label">Realisasi</span><span class="bidang-stat-val" style="color:${col}">${fmtS(real)}</span></div>
+        <div class="bidang-stat-row"><span class="bidang-stat-label">Sisa</span><span class="bidang-stat-val">${fmtS(sisa)}</span></div>
+        <div class="bidang-stat-row"><span class="bidang-stat-label">Terserap</span>
+          <span class="bidang-stat-val" style="color:${p>=80?'#dc2626':col}">${dispPct}%</span></div>
+      </div>`;
+  });
+  requestAnimationFrame(()=>animateMiniPies());
+}
+
 function renderLaporan(){
+  renderLapKas();
+  renderLapBidang();
   renderLapSumber();
   renderLapKegiatan();
   renderLapPajak();
@@ -4213,7 +4303,7 @@ function openPDFModal(){
   document.getElementById('modal-pdf-options').classList.add('open');
 }
 function setPDFAll(val){
-  ['ringkasan','sumber','bidang','kegiatan','pajak'].forEach(id=>{
+  ['ringkasan','kas','sumber','bidang','kegiatan','pajak'].forEach(id=>{
     const el=document.getElementById('pdf-opt-'+id);
     if(el) el.checked=val;
   });
@@ -4221,6 +4311,7 @@ function setPDFAll(val){
 function getPDFOpts(){
   return {
     ringkasan: document.getElementById('pdf-opt-ringkasan')?.checked!==false,
+    kas:       document.getElementById('pdf-opt-kas')?.checked!==false,
     sumber:    document.getElementById('pdf-opt-sumber')?.checked!==false,
     bidang:    document.getElementById('pdf-opt-bidang')?.checked!==false,
     kegiatan:  document.getElementById('pdf-opt-kegiatan')?.checked!==false,
@@ -4328,7 +4419,35 @@ function exportLaporanPDF(){
     </div>
   </div>
 
-`:''}  ${getPDFOpts().sumber?`<!-- REALISASI PER SUMBER DANA -->
+`:''}  ${getPDFOpts().kas?`<!-- SALDO KAS TUNAI -->
+  <div class="section" style="page-break-inside:avoid">
+    <div class="section-title">🪙 Saldo Kas Tunai</div>
+    <div class="stats-row">
+      ${(()=>{
+        const sumbs=['DD','ADD','PAD','PBH','DLL'];
+        const totalM=db.kas.filter(k=>k.nominal>0).reduce((s,k)=>s+k.nominal,0);
+        const totalK=db.kas.filter(k=>k.nominal<0).reduce((s,k)=>s+Math.abs(k.nominal),0);
+        let rows=`<div class="stat-box" style="border-color:#1a5c38">
+          <div class="label">Total Saldo Tunai</div>
+          <div class="val" style="color:#1a5c38">${fmt(totalM-totalK)}</div>
+          <div style="font-size:9px;color:#888;margin-top:3px">Masuk ${fmtS(totalM)} · Keluar ${fmtS(totalK)}</div>
+        </div>`;
+        sumbs.forEach(s=>{
+          const m=db.kas.filter(k=>k.nominal>0&&k.sumber===s).reduce((a,k)=>a+k.nominal,0);
+          const ke=db.kas.filter(k=>k.nominal<0&&k.sumber===s).reduce((a,k)=>a+Math.abs(k.nominal),0);
+          if(m===0&&ke===0) return;
+          const col=SUMBER_COLORS[s]||'#6b7280';
+          rows+=`<div class="stat-box" style="border-color:${col}">
+            <div class="label" style="color:${col}">${s}</div>
+            <div class="val" style="color:${col}">${fmt(m-ke)}</div>
+            <div style="font-size:9px;color:#888;margin-top:3px">Masuk ${fmtS(m)}</div>
+          </div>`;
+        });
+        return rows;
+      })()}
+    </div>
+  </div>
+  `:''}  ${getPDFOpts().sumber?`<!-- REALISASI PER SUMBER DANA -->
   <div class="section">
     <div class="section-title">💳 Realisasi per Sumber Dana</div>
     <div class="sumber-grid">
@@ -5110,11 +5229,10 @@ const ROLE_LABELS = {
 };
 
 const ROLE_NAV = {
-  // pages each role can see
   admin:     ['dashboard','progress','realisasi','kas','rab','laporan','konfig'],
-  bendahara: ['dashboard','progress','realisasi','kas','laporan'],
-  operator:  ['dashboard','progress','realisasi','kas','laporan'],
-  viewer:    ['dashboard','progress','laporan']
+  bendahara: ['dashboard','progress','realisasi','kas','rab','laporan'],
+  operator:  ['dashboard','progress','realisasi','kas','rab','laporan'],
+  viewer:    ['dashboard','progress','rab','laporan']
 };
 
 // Default admin account (only used to seed Firebase if no users exist)
@@ -5181,13 +5299,13 @@ async function doLogin(){
     errEl.textContent='Username dan password harus diisi.';
     errEl.classList.add('show'); return;
   }
-  btn.disabled=true; btn.textContent='Memeriksa...';
+  btn.disabled=true; btn.innerHTML='⏳ Memeriksa...';
   try{
     const snap = await fbDb.ref(USERS_REF+'/'+username).get();
     if(!snap.exists()||snap.val().password!==password){
       errEl.textContent='Username atau password salah.';
       errEl.classList.add('show');
-      btn.disabled=false; btn.textContent='Masuk →'; return;
+      btn.disabled=false; btn.innerHTML='Masuk Sistem &nbsp;→'; return;
     }
     const userData = snap.val();
     currentUser = {username, role:userData.role, displayName:userData.displayName||username};
@@ -5197,7 +5315,7 @@ async function doLogin(){
   }catch(e){
     errEl.textContent='Tidak dapat terhubung ke server. Periksa koneksi internet.';
     errEl.classList.add('show');
-    btn.disabled=false; btn.textContent='Masuk →';
+    btn.disabled=false; btn.innerHTML='Masuk Sistem &nbsp;→';
   }
 }
 
@@ -5251,10 +5369,18 @@ function doLogout(){
   document.body.removeAttribute('data-role');
   document.getElementById('topbar-role-badge').style.display='none';
   document.getElementById('topbar-logout-btn').style.display='none';
-  // Show login screen
-  document.getElementById('login-screen').style.display='flex';
+  // Reset login form completely
   document.getElementById('login-username').value='';
   document.getElementById('login-pass').value='';
+  const loginErr=document.getElementById('login-error');
+  if(loginErr) loginErr.classList.remove('show');
+  // Reset button state (fix bug: stuck "Memeriksa")
+  const loginBtn=document.getElementById('login-btn');
+  if(loginBtn){loginBtn.disabled=false;loginBtn.innerHTML='Masuk Sistem &nbsp;→';}
+  // Show login screen
+  document.getElementById('login-screen').style.display='flex';
+  // Focus username field
+  setTimeout(()=>document.getElementById('login-username')?.focus(),100);
   // Detach Firebase listener
   if(typeof fbDb!=='undefined') fbDb.ref(FB_REF).off();
 }
@@ -5338,6 +5464,11 @@ init();
         <div><div style="font-size:13px;font-weight:600;color:var(--text)">📊 Ringkasan Umum</div>
           <div style="font-size:11px;color:var(--text-3)">Total anggaran, realisasi, % terserap (infografis)</div></div>
       </label>
+      <label style="display:flex;align-items:center;gap:10px;padding:10px 12px;border:1.5px solid var(--border);border-radius:var(--radius-sm);cursor:pointer">
+        <input type="checkbox" id="pdf-opt-kas" checked style="width:16px;height:16px;accent-color:var(--primary)">
+        <div><div style="font-size:13px;font-weight:600;color:var(--text)">🪙 Saldo Kas Tunai</div>
+          <div style="font-size:11px;color:var(--text-3)">Total saldo + saldo per sumber dana</div></div>
+      </label>
       <label style="display:flex;align-items:center;gap:10px;padding:10px 12px;border:1.5px solid var(--border);border-radius:var(--radius-sm);cursor:pointer"
         id="pdf-opt-sumber-wrap">
         <input type="checkbox" id="pdf-opt-sumber" checked style="width:16px;height:16px;accent-color:var(--primary)">
@@ -5356,8 +5487,7 @@ init();
         <div><div style="font-size:13px;font-weight:600;color:var(--text)">📋 Realisasi per Kegiatan</div>
           <div style="font-size:11px;color:var(--text-3)">Tabel lengkap semua kegiatan RAB</div></div>
       </label>
-      <label style="display:flex;align-items:center;gap:10px;padding:10px 12px;border:1.5px solid var(--border);border-radius:var(--radius-sm);cursor:pointer"
-        id="pdf-opt-pajak-wrap">
+      <label id="pdf-opt-pajak-wrap" style="display:flex;align-items:center;gap:10px;padding:10px 12px;border:1.5px solid var(--border);border-radius:var(--radius-sm);cursor:pointer">
         <input type="checkbox" id="pdf-opt-pajak" checked style="width:16px;height:16px;accent-color:var(--primary)">
         <div><div style="font-size:13px;font-weight:600;color:var(--text)">🧾 Laporan Pajak</div>
           <div style="font-size:11px;color:var(--text-3)">Rekap pajak, status lunas/belum</div></div>
