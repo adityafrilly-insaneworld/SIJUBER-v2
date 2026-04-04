@@ -1057,9 +1057,251 @@ td:nth-child(2),td.td-name{white-space:normal;word-break:break-word}
     justify-content:flex-start;
   }
 }
+
+/* ══════════ LOGIN SCREEN ══════════ */
+/* ══════════ LOGIN — macOS/iOS Style ══════════ */
+@keyframes loginFadeIn{
+  from{opacity:0;transform:translateY(24px) scale(0.97)}
+  to{opacity:1;transform:translateY(0) scale(1)}
+}
+@keyframes glowPulse{
+  0%,100%{opacity:.55}
+  50%{opacity:.85}
+}
+#login-screen{
+  position:fixed;inset:0;z-index:9999;
+  display:flex;align-items:center;justify-content:center;
+  padding:20px;
+  /* Deep dark background */
+  background:radial-gradient(ellipse 80% 70% at 15% 80%,rgba(22,101,52,.55) 0%,transparent 60%),
+             radial-gradient(ellipse 70% 60% at 85% 15%,rgba(120,80,10,.45) 0%,transparent 55%),
+             radial-gradient(ellipse 100% 100% at 50% 50%,#050d0a 0%,#080f0c 100%);
+  overflow:hidden;
+}
+/* Ambient orbs */
+#login-screen::before,#login-screen::after{
+  content:'';position:absolute;border-radius:50%;filter:blur(70px);
+  animation:glowPulse 4s ease-in-out infinite;pointer-events:none;
+}
+#login-screen::before{
+  width:420px;height:420px;bottom:-100px;left:-80px;
+  background:radial-gradient(circle,rgba(26,92,56,.7),transparent 70%);
+  animation-delay:0s;
+}
+#login-screen::after{
+  width:350px;height:350px;top:-80px;right:-60px;
+  background:radial-gradient(circle,rgba(180,120,20,.5),transparent 70%);
+  animation-delay:2s;
+}
+/* Glass card */
+.login-card{
+  position:relative;z-index:1;
+  width:100%;max-width:400px;
+  padding:40px 36px 32px;
+  border-radius:24px;
+  background:rgba(18,28,22,.75);
+  backdrop-filter:blur(32px) saturate(160%);
+  -webkit-backdrop-filter:blur(32px) saturate(160%);
+  border:1px solid rgba(255,255,255,.10);
+  box-shadow:
+    0 0 0 1px rgba(255,255,255,.04) inset,
+    0 32px 80px rgba(0,0,0,.55),
+    0 8px 24px rgba(0,0,0,.3);
+  animation:loginFadeIn .55s cubic-bezier(.16,1,.3,1) both;
+}
+/* Logo area */
+.login-logo{text-align:center;margin-bottom:28px}
+.login-logo-icon{
+  width:68px;height:68px;margin:0 auto 14px;
+  background:linear-gradient(145deg,#1a5c38,#0d3321);
+  border-radius:20px;
+  display:flex;align-items:center;justify-content:center;font-size:30px;
+  box-shadow:0 8px 24px rgba(26,92,56,.5),0 0 0 1px rgba(255,255,255,.08) inset;
+}
+.login-logo-name{
+  font-size:24px;font-weight:800;letter-spacing:3px;
+  color:#fff;text-transform:uppercase;
+  text-shadow:0 2px 12px rgba(26,92,56,.6);
+}
+.login-logo-sub{
+  font-size:11px;color:rgba(255,255,255,.38);
+  margin-top:4px;letter-spacing:1.5px;text-transform:uppercase;
+}
+/* Desa info */
+.login-desa-info{
+  font-size:12px;color:rgba(255,255,255,.55);text-align:center;
+  margin-bottom:24px;padding-bottom:20px;
+  border-bottom:1px solid rgba(255,255,255,.07);
+  letter-spacing:.3px;
+}
+/* Fields */
+.login-field{margin-bottom:12px}
+.login-field label{
+  display:block;font-size:10px;font-weight:700;
+  color:rgba(255,255,255,.4);
+  text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;
+}
+.login-input-wrap{position:relative}
+.login-input-icon{
+  position:absolute;left:14px;top:50%;transform:translateY(-50%);
+  color:rgba(255,255,255,.3);font-size:13px;pointer-events:none;
+}
+.login-field input{
+  width:100%;padding:12px 14px 12px 38px;
+  background:rgba(255,255,255,.07);
+  border:1px solid rgba(255,255,255,.11);
+  border-radius:12px;
+  color:#fff;font-size:14px;font-family:inherit;
+  outline:none;box-sizing:border-box;
+  transition:all .2s;
+  caret-color:#4ade80;
+}
+.login-field input::placeholder{color:rgba(255,255,255,.22)}
+.login-field input:focus{
+  background:rgba(255,255,255,.10);
+  border-color:rgba(74,222,128,.4);
+  box-shadow:0 0 0 3px rgba(26,92,56,.3),0 0 16px rgba(74,222,128,.08);
+}
+/* Password toggle */
+.login-pw-toggle{
+  position:absolute;right:12px;top:50%;transform:translateY(-50%);
+  background:none;border:none;color:rgba(255,255,255,.3);
+  cursor:pointer;font-size:14px;padding:4px;
+  transition:color .15s;
+}
+.login-pw-toggle:hover{color:rgba(255,255,255,.6)}
+/* Error */
+.login-error{
+  background:rgba(239,68,68,.12);
+  border:1px solid rgba(239,68,68,.25);
+  border-radius:10px;padding:9px 12px;
+  font-size:12px;color:#fca5a5;
+  margin-bottom:12px;display:none;
+  backdrop-filter:blur(8px);
+}
+.login-error.show{display:block}
+/* Button */
+.login-btn{
+  width:100%;padding:13px;margin-top:8px;
+  background:linear-gradient(135deg,#1a7a45 0%,#16a34a 50%,#15803d 100%);
+  color:#fff;border:none;border-radius:12px;
+  font-size:14px;font-weight:700;font-family:inherit;
+  cursor:pointer;letter-spacing:.3px;
+  box-shadow:0 4px 20px rgba(22,163,74,.4),0 1px 3px rgba(0,0,0,.3);
+  transition:all .2s;
+  position:relative;overflow:hidden;
+}
+.login-btn::before{
+  content:'';position:absolute;inset:0;
+  background:linear-gradient(180deg,rgba(255,255,255,.10) 0%,transparent 100%);
+}
+.login-btn:hover:not(:disabled){
+  transform:translateY(-1px);
+  box-shadow:0 6px 28px rgba(22,163,74,.5),0 2px 6px rgba(0,0,0,.3);
+}
+.login-btn:active:not(:disabled){transform:translateY(0)}
+.login-btn:disabled{opacity:.5;cursor:not-allowed;transform:none}
+/* Version info */
+.login-version{
+  display:flex;align-items:center;justify-content:center;gap:6px;
+  margin-top:20px;font-size:10px;color:rgba(255,255,255,.22);
+  letter-spacing:.8px;text-transform:uppercase;
+}
+.login-version-dot{
+  width:5px;height:5px;border-radius:50%;background:#4ade80;
+  box-shadow:0 0 6px #4ade80;
+}
+/* Role badge di topbar */
+.role-badge{
+  display:inline-flex;align-items:center;gap:5px;
+  padding:3px 9px;border-radius:12px;font-size:11px;font-weight:700;
+  cursor:default;white-space:nowrap;
+}
+.role-admin{background:#fef3c7;color:#92400e}
+.role-bendahara{background:#dcfce7;color:#15803d}
+.role-operator{background:#eff6ff;color:#1d4ed8}
+.role-viewer{background:#f5f3ff;color:#6d28d9}
+/* Hide elements berdasarkan role */
+body[data-role="viewer"] .hide-viewer,
+body[data-role="operator"] .hide-operator,
+body[data-role="bendahara"] .hide-bendahara{display:none!important}
+/* Admin-only elements */
+body:not([data-role="admin"]) .admin-only{display:none!important}
+/* Viewer: hanya lihat, semua tombol input disembunyikan */
+body[data-role="viewer"] .btn-primary:not(.allow-viewer),
+body[data-role="viewer"] .btn-outline:not(.allow-viewer),
+body[data-role="viewer"] .fab{display:none!important}
+/* Operator: tidak bisa ubah RAB & konfigurasi */
+body[data-role="operator"] #page-rab .btn-primary,
+body[data-role="operator"] #page-rab .btn-danger,
+body[data-role="operator"] #page-rab .btn-icon,
+body[data-role="operator"] #page-konfig .btn-primary,
+body[data-role="operator"] #page-konfig .btn-danger,
+body[data-role="operator"] #page-konfig .btn-outline{display:none!important}
+/* Bendahara: tidak bisa ubah RAB */
+body[data-role="bendahara"] #page-rab .btn-primary,
+body[data-role="bendahara"] #page-rab .btn-danger,
+body[data-role="bendahara"] #page-rab .btn-icon{display:none!important}
 </style>
 </head>
 <body>
+
+<!-- ══ LOGIN SCREEN ══ -->
+<div id="login-screen">
+  <div class="login-card">
+
+    <!-- Logo -->
+    <div class="login-logo">
+      <div class="login-logo-icon">🌿</div>
+      <div class="login-logo-name">SIJUBER</div>
+      <div class="login-logo-sub">Sistem Menuju Berkah</div>
+    </div>
+
+    <!-- Desa info (filled by JS) -->
+    <div class="login-desa-info" id="login-desa-info">Memuat informasi desa...</div>
+
+    <!-- Error -->
+    <div class="login-error" id="login-error"></div>
+
+    <!-- Username -->
+    <div class="login-field">
+      <label>Username</label>
+      <div class="login-input-wrap">
+        <span class="login-input-icon">👤</span>
+        <input type="text" id="login-username"
+          placeholder="NIP / ID Petugas"
+          autocomplete="username"
+          onkeydown="if(event.key==='Enter')document.getElementById('login-pass').focus()">
+      </div>
+    </div>
+
+    <!-- Password -->
+    <div class="login-field">
+      <label>Password</label>
+      <div class="login-input-wrap">
+        <span class="login-input-icon">🔒</span>
+        <input type="password" id="login-pass"
+          placeholder="Masukkan kata sandi"
+          autocomplete="current-password"
+          onkeydown="if(event.key==='Enter')doLogin()">
+        <button class="login-pw-toggle" onclick="toggleLoginPw()" tabindex="-1" id="login-pw-toggle">👁</button>
+      </div>
+    </div>
+
+    <!-- Button -->
+    <button class="login-btn" id="login-btn" onclick="doLogin()">
+      Masuk Sistem &nbsp;→
+    </button>
+
+    <!-- Version -->
+    <div class="login-version">
+      <div class="login-version-dot"></div>
+      <span id="login-version-text">v4.0 · TA 2026</span>
+    </div>
+
+  </div>
+</div>
+
 <div class="layout">
 
 <!-- ══ SIDEBAR ══ -->
@@ -1115,6 +1357,10 @@ td:nth-child(2),td.td-name{white-space:normal;word-break:break-word}
         <span id="sync-label">localStorage</span>
       </div>
       <span class="ta-badge" id="tb-badge">TA 2026</span>
+      <span class="role-badge" id="topbar-role-badge" style="display:none"></span>
+      <button id="topbar-logout-btn" onclick="doLogout()" title="Keluar"
+        style="display:none;width:30px;height:30px;border-radius:8px;border:1.5px solid var(--border);
+        background:var(--surface2);cursor:pointer;font-size:13px;color:var(--text-2)">⏏</button>
     </div>
   </div>
   <div class="content">
@@ -1468,7 +1714,7 @@ td:nth-child(2),td.td-name{white-space:normal;word-break:break-word}
   <div class="page" id="page-laporan">
     <div class="section-header">
       <div><div class="section-title">📊 Laporan Realisasi</div><div class="section-sub">Rekap anggaran, realisasi, pajak, dan sumber dana</div></div>
-      <button class="btn btn-primary" onclick="exportLaporanPDF()">📄 Export PDF</button>
+      <button class="btn btn-primary allow-viewer" onclick="openPDFModal()">📄 Export PDF</button>
     </div>
 
     <!-- ① KARTU PER SUMBER DANA -->
@@ -1561,6 +1807,32 @@ td:nth-child(2),td.td-name{white-space:normal;word-break:break-word}
         <div class="btn-row">
           <button class="btn btn-ghost" onclick="resetKeRABAwal()">🔄 Reset ke RAB Awal</button>
           <button class="btn btn-danger" onclick="confirmReset()">🗑️ Hapus Semua Data</button>
+        </div>
+      </div>
+      <!-- Kelola User (Admin only) -->
+      <div class="card admin-only" id="card-kelola-user">
+        <div class="card-title">👥 Kelola Pengguna</div>
+        <div class="card-sub">Tambah, edit, dan hapus akun pengguna SIJUBER</div>
+        <div id="user-list-wrap"></div>
+        <div style="margin-top:14px;border-top:1px solid var(--border);padding-top:14px">
+          <div style="font-size:12px;font-weight:700;color:var(--text-2);margin-bottom:10px">➕ Tambah Pengguna Baru</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr auto;gap:8px;align-items:end">
+            <div class="form-group"><label>Username</label><input type="text" id="new-user-username" placeholder="contoh: budi123"></div>
+            <div class="form-group"><label>Password</label><input type="text" id="new-user-pass" placeholder="min. 6 karakter"></div>
+            <div class="form-group"><label>Role</label>
+              <select id="new-user-role">
+                <option value="admin">Admin</option>
+                <option value="bendahara" selected>Bendahara</option>
+                <option value="operator">Operator</option>
+                <option value="viewer">Viewer</option>
+              </select>
+            </div>
+            <div class="form-group" style="align-items:flex-end">
+              <label style="visibility:hidden">x</label>
+              <button class="btn btn-primary" onclick="tambahUser()">+ Tambah</button>
+            </div>
+          </div>
+          <div class="alert" id="user-alert" style="margin-top:8px"></div>
         </div>
       </div>
     </div>
@@ -3573,6 +3845,8 @@ function loadKonfig(){
   document.getElementById('konfig-desa').value=db.konfig.desa;
   document.getElementById('konfig-kec').value=db.konfig.kec||'';
   document.getElementById('konfig-ta').value=db.konfig.ta;
+
+  if(currentUser&&currentUser.role==='admin') loadUserList();
 }
 function simpanKonfig(){
   db.konfig.desa=document.getElementById('konfig-desa').value.trim()||'Desa Lestari';
@@ -3933,7 +4207,29 @@ document.querySelectorAll('.modal-overlay').forEach(el=>{
 // ═══════════════════════════════════════════════
 //  EXPORT LAPORAN PDF
 // ═══════════════════════════════════════════════
+
+// ── PDF export modal ──
+function openPDFModal(){
+  document.getElementById('modal-pdf-options').classList.add('open');
+}
+function setPDFAll(val){
+  ['ringkasan','sumber','bidang','kegiatan','pajak'].forEach(id=>{
+    const el=document.getElementById('pdf-opt-'+id);
+    if(el) el.checked=val;
+  });
+}
+function getPDFOpts(){
+  return {
+    ringkasan: document.getElementById('pdf-opt-ringkasan')?.checked!==false,
+    sumber:    document.getElementById('pdf-opt-sumber')?.checked!==false,
+    bidang:    document.getElementById('pdf-opt-bidang')?.checked!==false,
+    kegiatan:  document.getElementById('pdf-opt-kegiatan')?.checked!==false,
+    pajak:     document.getElementById('pdf-opt-pajak')?.checked!==false,
+  };
+}
+
 function exportLaporanPDF(){
+  closeModal('modal-pdf-options');
   showToast('Menyiapkan PDF...','info','📄');
 
   // Build PDF HTML content
@@ -4009,7 +4305,7 @@ function exportLaporanPDF(){
     .badge-belum{background:#fef9c3;color:#a16207;padding:1px 5px;border-radius:3px;font-size:9px;font-weight:700}
     .infografis{display:flex;align-items:center;gap:16px;background:#f7f8fa;border-radius:10px;padding:14px;margin-bottom:16px}
     .footer{margin-top:20px;padding-top:10px;border-top:1px solid #e4e7ec;text-align:center;color:#888;font-size:9px}
-    @media print{body{padding:12px}@page{size:A4;margin:12mm}}
+    @media print{body{padding:12px}@page{size:A4;margin:12mm}tr{page-break-inside:avoid}}
   </style>
   </head><body>
   <div class="header">
@@ -4018,7 +4314,7 @@ function exportLaporanPDF(){
     <p style="margin-top:3px">Dicetak pada ${now}</p>
   </div>
 
-  <!-- INFOGRAFIS RINGKASAN -->
+  ${getPDFOpts().ringkasan?`<!-- INFOGRAFIS RINGKASAN -->
   <div class="infografis">
     <div>${svgDonut(pct,'#1a5c38',90)}</div>
     <div style="flex:1">
@@ -4032,7 +4328,7 @@ function exportLaporanPDF(){
     </div>
   </div>
 
-  <!-- REALISASI PER SUMBER DANA -->
+`:''}  ${getPDFOpts().sumber?`<!-- REALISASI PER SUMBER DANA -->
   <div class="section">
     <div class="section-title">💳 Realisasi per Sumber Dana</div>
     <div class="sumber-grid">
@@ -4051,21 +4347,78 @@ function exportLaporanPDF(){
     </div>
   </div>
 
-  <!-- REALISASI PER KEGIATAN -->
-  <div class="section">
+`:''}  ${getPDFOpts().bidang?`<!-- REALISASI PER BIDANG -->
+  <div class="section" style="page-break-inside:avoid">
+    <div class="section-title">🗂️ Realisasi per Bidang</div>
+    <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px">
+      ${(()=>{
+        return db.bidang.map((b,i)=>{
+          const bidangCol=['#1a5c38','#2563eb','#7c3aed','#d97706','#dc2626'][i]||'#888';
+          const rabBidang=db.rab.filter(r=>r.bidang===b.id);
+          const ang=rabBidang.reduce((s,r)=>s+r.jumlah,0);
+          const real=db.realisasi.filter(r=>{const k=db.rab.find(x=>x.id===r.rabId);return k&&k.bidang===b.id;}).reduce((s,r)=>s+r.bruto,0);
+          const sisa=ang-real;
+          const p=ang>0?real/ang*100:0;
+          const cx=40,cy=40,ri=30,circ=2*Math.PI*ri;
+          const fillLen=Math.min(p,100)/100*circ;
+          const offset=circ-fillLen;
+          const donut=`<svg width="80" height="80" viewBox="0 0 80 80">
+            <circle cx="${cx}" cy="${cy}" r="${ri}" fill="none" stroke="#e4e7ec" stroke-width="10"/>
+            ${p>0?`<circle cx="${cx}" cy="${cy}" r="${ri}" fill="none" stroke="${bidangCol}" stroke-width="10"
+              stroke-linecap="round" stroke-dasharray="${circ}" stroke-dashoffset="${offset}"
+              transform="rotate(-90 ${cx} ${cy})"/>`:''}
+            <circle cx="${cx}" cy="${cy}" r="22" fill="white"/>
+            <text x="${cx}" y="${cy+4}" text-anchor="middle" font-size="9" font-weight="700" fill="${bidangCol}" font-family="Arial">${p.toFixed(0)}%</text>
+          </svg>`;
+          return `<div style="border:1px solid #e4e7ec;border-radius:8px;padding:10px 8px;border-top:3px solid ${bidangCol};text-align:center">
+            <div style="display:flex;justify-content:center;margin-bottom:6px">${donut}</div>
+            <div style="font-size:9px;font-weight:700;color:#333;line-height:1.3;margin-bottom:8px;min-height:24px">${b.nama}</div>
+            <div style="font-size:8px;color:#888;text-transform:uppercase;letter-spacing:.3px">Anggaran</div>
+            <div style="font-size:10px;font-weight:700;color:#333;margin-bottom:4px">${fmtS(ang)}</div>
+            <div style="font-size:8px;color:#888;text-transform:uppercase;letter-spacing:.3px">Realisasi</div>
+            <div style="font-size:10px;font-weight:700;color:${bidangCol}">${fmtS(real)}</div>
+            <div style="font-size:8px;color:#888;margin-top:4px">Sisa: ${fmtS(sisa)}</div>
+          </div>`;
+        }).join('');
+      })()}
+    </div>
+  </div>
+
+`:''}  ${getPDFOpts().kegiatan?`<!-- REALISASI PER KEGIATAN -->
+  <div class="section" style="page-break-before:auto">
     <div class="section-title">📋 Realisasi per Kegiatan</div>
     <table>
-      <thead><tr><th>Kode</th><th>Kegiatan</th><th>Anggaran</th><th>Realisasi</th><th>Sisa</th><th style="min-width:80px">% Realisasi</th></tr></thead>
+      <thead><tr>
+        <th style="width:70px">Kode</th>
+        <th>Kegiatan</th>
+        <th style="width:90px">Anggaran</th>
+        <th style="width:90px">Realisasi</th>
+        <th style="width:80px">Sisa</th>
+        <th style="width:80px">% Realisasi</th>
+      </tr></thead>
       <tbody>
-        ${db.rab.map(r=>{
+        ${sortByKode(db.rab).map(r=>{
           const real=getRealByRabId(r.id),sisa=r.jumlah-real,p=r.jumlah>0?real/r.jumlah*100:0;
-          return `<tr><td style="font-family:monospace">${r.kode}</td><td style="font-weight:600">${r.kegiatan}</td><td style="font-family:monospace">${fmt(r.jumlah)}</td><td style="font-family:monospace;color:#1a5c38">${fmt(real)}</td><td style="font-family:monospace">${fmt(sisa)}</td><td><div class="pct-bar-wrap"><div class="pct-bar-track"><div class="pct-bar-fill" style="width:${Math.min(p,100)}%;background:${p>=80?'#f5a623':'#1a5c38'}"></div></div><span style="font-size:9px;font-weight:700;color:${p>=80?'#d97706':'#1a5c38'}">${p.toFixed(1)}%</span></div></td></tr>`;
+          const isEx=sisa===0&&real>0;
+          const dispPct=isEx?'100.0':(Math.floor(p*10)/10).toFixed(1);
+          const pCol=isEx?'#16a34a':p>=80?'#d97706':'#1a5c38';
+          return `<tr style="${isEx?'background:#f0fdf4':''};page-break-inside:avoid">
+            <td style="font-family:monospace;font-size:9px">${r.kode}</td>
+            <td style="font-weight:600">${r.kegiatan}${isEx?'&nbsp;<span style="background:#16a34a;color:#fff;padding:1px 4px;border-radius:3px;font-size:8px;font-weight:700">✓ Selesai</span>':''}</td>
+            <td style="font-family:monospace;text-align:right">${fmt(r.jumlah)}</td>
+            <td style="font-family:monospace;color:#1a5c38;text-align:right">${fmt(real)}</td>
+            <td style="font-family:monospace;text-align:right">${fmt(sisa)}</td>
+            <td><div class="pct-bar-wrap">
+              <div class="pct-bar-track"><div class="pct-bar-fill" style="width:${Math.min(p,100)}%;background:${pCol}"></div></div>
+              <span style="font-size:9px;font-weight:700;color:${pCol};white-space:nowrap">${dispPct}%</span>
+            </div></td>
+          </tr>`;
         }).join('')}
       </tbody>
     </table>
   </div>
 
-  <!-- LAPORAN PAJAK -->
+`:''}  ${getPDFOpts().pajak?`<!-- LAPORAN PAJAK -->
   <div class="section">
     <div class="section-title">🧾 Laporan Pajak</div>
     <div class="stats-row" style="margin-bottom:12px">
@@ -4091,14 +4444,14 @@ function exportLaporanPDF(){
       </tbody>
     </table>`:'<p style="color:#888;font-size:11px">Belum ada data pajak.</p>'}
   </div>
-
+`:''}  
   <div class="footer">
     Laporan ini digenerate otomatis oleh SIJUBER (Sistem Menuju Berkah) · ${desa} · TA ${ta}
   </div>
   </body></html>`;
 
   // Open print window
-  const win=window.open('','_blank','width=900,height=700');
+  const win=window.open('','_blank','width=1000,height=800,scrollbars=yes');
   win.document.write(html);
   win.document.close();
   win.onload=()=>{
@@ -4741,18 +5094,285 @@ function simpanSetor(){
   showToast(`Setoran ${fmt(nominal)} dari ${sumber} berhasil dicatat 🏦`,'success','🏦');
 }
 
+
+// ═══════════════════════════════════════════════
+//  AUTH — Login System
+// ═══════════════════════════════════════════════
+const USERS_REF = 'sijuber/users';
+const SESSION_KEY = 'sijuber_session';
+let currentUser = null; // {username, role, displayName}
+
+const ROLE_LABELS = {
+  admin: {label:'Admin', cls:'role-admin', icon:'👑'},
+  bendahara: {label:'Bendahara', cls:'role-bendahara', icon:'💼'},
+  operator: {label:'Operator', cls:'role-operator', icon:'✍️'},
+  viewer: {label:'Viewer', cls:'role-viewer', icon:'👁️'}
+};
+
+const ROLE_NAV = {
+  // pages each role can see
+  admin:     ['dashboard','progress','realisasi','kas','rab','laporan','konfig'],
+  bendahara: ['dashboard','progress','realisasi','kas','laporan'],
+  operator:  ['dashboard','progress','realisasi','kas','laporan'],
+  viewer:    ['dashboard','progress','laporan']
+};
+
+// Default admin account (only used to seed Firebase if no users exist)
+const DEFAULT_ADMIN = {username:'admin', password:'sijuber2026', role:'admin', displayName:'Administrator'};
+
+async function initAuth(){
+  // Check session in localStorage
+  try{
+    const s = localStorage.getItem(SESSION_KEY);
+    if(s){
+      const sess = JSON.parse(s);
+      // Verify user still exists in Firebase
+      const snap = await fbDb.ref(USERS_REF+'/'+sess.username).get();
+      if(snap.exists()&&snap.val().password===sess.password){
+        currentUser = {username:sess.username, role:snap.val().role, displayName:snap.val().displayName||sess.username};
+        onLoginSuccess();
+        return;
+      }
+    }
+  }catch(e){console.warn('Session check error:',e);}
+  // Show login screen
+  document.getElementById('login-screen').style.display='flex';
+}
+
+async function ensureDefaultAdmin(){
+  // Seed default admin if users node is empty
+  try{
+    const snap = await fbDb.ref(USERS_REF).get();
+    if(!snap.exists()||Object.keys(snap.val()||{}).length===0){
+      await fbDb.ref(USERS_REF+'/admin').set(DEFAULT_ADMIN);
+      console.log('Default admin seeded');
+    }
+  }catch(e){console.warn('Seed admin error:',e);}
+}
+
+
+function toggleLoginPw(){
+  const inp=document.getElementById('login-pass');
+  const btn=document.getElementById('login-pw-toggle');
+  if(inp.type==='password'){inp.type='text';if(btn)btn.textContent='🙈';}
+  else{inp.type='password';if(btn)btn.textContent='👁';}
+}
+
+function updateLoginInfo(){
+  // Fill desa info and version on login screen
+  const desaEl=document.getElementById('login-desa-info');
+  const verEl=document.getElementById('login-version-text');
+  if(desaEl){
+    const desa=db?.konfig?.desa||'Desa Impian';
+    const ta=db?.konfig?.ta||'2026';
+    const kec=db?.konfig?.kec||'';
+    desaEl.textContent=(kec?kec+' · ':'')+desa+' · TA '+ta;
+  }
+  if(verEl) verEl.textContent='v4.0 · TA '+(db?.konfig?.ta||'2026');
+}
+
+async function doLogin(){
+  const username = document.getElementById('login-username').value.trim().toLowerCase();
+  const password = document.getElementById('login-pass').value;
+  const errEl = document.getElementById('login-error');
+  const btn = document.getElementById('login-btn');
+  errEl.classList.remove('show');
+  if(!username||!password){
+    errEl.textContent='Username dan password harus diisi.';
+    errEl.classList.add('show'); return;
+  }
+  btn.disabled=true; btn.textContent='Memeriksa...';
+  try{
+    const snap = await fbDb.ref(USERS_REF+'/'+username).get();
+    if(!snap.exists()||snap.val().password!==password){
+      errEl.textContent='Username atau password salah.';
+      errEl.classList.add('show');
+      btn.disabled=false; btn.textContent='Masuk →'; return;
+    }
+    const userData = snap.val();
+    currentUser = {username, role:userData.role, displayName:userData.displayName||username};
+    // Save session
+    localStorage.setItem(SESSION_KEY, JSON.stringify({username, password, role:userData.role}));
+    onLoginSuccess();
+  }catch(e){
+    errEl.textContent='Tidak dapat terhubung ke server. Periksa koneksi internet.';
+    errEl.classList.add('show');
+    btn.disabled=false; btn.textContent='Masuk →';
+  }
+}
+
+function onLoginSuccess(){
+  // Hide login screen
+  document.getElementById('login-screen').style.display='none';
+  // Apply role to body
+  document.body.setAttribute('data-role', currentUser.role);
+  // Update topbar
+  const roleMeta = ROLE_LABELS[currentUser.role]||{label:currentUser.role,cls:'',icon:'👤'};
+  const badgeEl = document.getElementById('topbar-role-badge');
+  const logoutBtn = document.getElementById('topbar-logout-btn');
+  if(badgeEl){
+    badgeEl.textContent = roleMeta.icon+' '+currentUser.displayName;
+    badgeEl.className = 'role-badge '+roleMeta.cls;
+    badgeEl.style.display='inline-flex';
+  }
+  if(logoutBtn) logoutBtn.style.display='flex';
+  // Apply nav restrictions
+  applyRoleNav();
+  // Start Firebase listener and init app
+  fbStartListener();
+  applyTheme(localStorage.getItem(THEME_KEY)||'light');
+  initSync();
+  applySidebar(localStorage.getItem(SIDEBAR_KEY)==='1');
+  updateBrand(); loadKonfig(); renderDashboard();
+  document.getElementById('real-tanggal').value=new Date().toISOString().split('T')[0];
+  showToast('Selamat datang, '+currentUser.displayName+'!','success',roleMeta.icon);
+}
+
+function applyRoleNav(){
+  const allowed = ROLE_NAV[currentUser.role]||['dashboard'];
+  // Sidebar nav items
+  document.querySelectorAll('.nav-item[data-page]').forEach(el=>{
+    el.style.display=allowed.includes(el.dataset.page)?'':'none';
+  });
+  // Bottom nav items
+  document.querySelectorAll('.bn-item[data-page]').forEach(el=>{
+    el.style.display=allowed.includes(el.dataset.page)?'':'none';
+  });
+  // Bottom nav more menu items
+  document.querySelectorAll('.bn-more-item[data-page]').forEach(el=>{
+    el.style.display=allowed.includes(el.dataset.page)?'':'none';
+  });
+}
+
+function doLogout(){
+  if(!confirm('Keluar dari SIJUBER?')) return;
+  localStorage.removeItem(SESSION_KEY);
+  currentUser=null;
+  document.body.removeAttribute('data-role');
+  document.getElementById('topbar-role-badge').style.display='none';
+  document.getElementById('topbar-logout-btn').style.display='none';
+  // Show login screen
+  document.getElementById('login-screen').style.display='flex';
+  document.getElementById('login-username').value='';
+  document.getElementById('login-pass').value='';
+  // Detach Firebase listener
+  if(typeof fbDb!=='undefined') fbDb.ref(FB_REF).off();
+}
+
+// ── Kelola User ──
+async function loadUserList(){
+  const wrap = document.getElementById('user-list-wrap');
+  if(!wrap) return;
+  try{
+    const snap = await fbDb.ref(USERS_REF).get();
+    const users = snap.val()||{};
+    if(!Object.keys(users).length){
+      wrap.innerHTML='<div style="font-size:12px;color:var(--text-3);padding:8px 0">Belum ada pengguna.</div>';
+      return;
+    }
+    wrap.innerHTML='<div class="table-wrap"><table style="table-layout:auto;min-width:400px"><thead><tr>'
+      +'<th>Username</th><th>Nama</th><th>Role</th><th>Status</th><th></th></tr></thead><tbody>'
+      +Object.entries(users).map(([u,d])=>`<tr>
+        <td class="mono">${u}</td>
+        <td>${d.displayName||'-'}</td>
+        <td><span class="role-badge ${ROLE_LABELS[d.role]?.cls||''}">${ROLE_LABELS[d.role]?.icon||''} ${d.role}</span></td>
+        <td><span class="badge" style="background:var(--primary-light);color:var(--primary)">Aktif</span></td>
+        <td style="white-space:nowrap">
+          ${u!=='admin'?`<button class="btn btn-danger btn-sm" onclick="hapusUser('${u}')">✕</button>`:'<span style="font-size:10px;color:var(--text-3)">Default</span>'}
+        </td>
+      </tr>`).join('')
+      +'</tbody></table></div>';
+  }catch(e){
+    wrap.innerHTML='<div style="font-size:12px;color:var(--danger)">Gagal memuat daftar user.</div>';
+  }
+}
+
+async function tambahUser(){
+  const username = document.getElementById('new-user-username').value.trim().toLowerCase();
+  const password = document.getElementById('new-user-pass').value.trim();
+  const role = document.getElementById('new-user-role').value;
+  const alertEl = document.getElementById('user-alert');
+  if(!username||!password) return showAlert('user-alert','danger','Username dan password harus diisi.');
+  if(password.length<6) return showAlert('user-alert','danger','Password minimal 6 karakter.');
+  if(!/^[a-z0-9_]+$/.test(username)) return showAlert('user-alert','danger','Username hanya boleh huruf kecil, angka, dan underscore.');
+  try{
+    const snap = await fbDb.ref(USERS_REF+'/'+username).get();
+    if(snap.exists()) return showAlert('user-alert','danger','Username sudah dipakai.');
+    await fbDb.ref(USERS_REF+'/'+username).set({username,password,role,displayName:username});
+    document.getElementById('new-user-username').value='';
+    document.getElementById('new-user-pass').value='';
+    showAlert('user-alert','success','Pengguna berhasil ditambahkan!');
+    loadUserList();
+  }catch(e){showAlert('user-alert','danger','Gagal menyimpan: '+e.message);}
+}
+
+async function hapusUser(username){
+  if(!confirm('Hapus pengguna "'+username+'"? Tindakan ini tidak bisa dibatalkan.')) return;
+  try{
+    await fbDb.ref(USERS_REF+'/'+username).remove();
+    showToast('Pengguna '+username+' dihapus','success','🗑️');
+    loadUserList();
+  }catch(e){showToast('Gagal hapus user','danger','⚠️');}
+}
+
 // ═══════════════════════════════════════════════
 //  INIT
 // ═══════════════════════════════════════════════
 function init(){
-  applyTheme(localStorage.getItem(THEME_KEY)||'light');
-  initSync();
-  applySidebar(localStorage.getItem(SIDEBAR_KEY)==='1');
-  updateBrand();loadKonfig();renderDashboard();
-  document.getElementById('real-tanggal').value=new Date().toISOString().split('T')[0];
+  // Auth flow: initAuth() will call onLoginSuccess() if session valid
+  // onLoginSuccess() handles all render initialization
+  ensureDefaultAdmin().then(()=>{updateLoginInfo();initAuth();});
 }
 init();
 </script>
+
+<!-- ══ MODAL: PILIHAN PDF ══ -->
+<div class="modal-overlay" id="modal-pdf-options">
+  <div class="modal" style="max-width:420px">
+    <div class="modal-title">📄 Export Laporan PDF</div>
+    <div class="modal-sub">Pilih section yang ingin ditampilkan dalam laporan</div>
+    <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:18px">
+      <label style="display:flex;align-items:center;gap:10px;padding:10px 12px;border:1.5px solid var(--border);border-radius:var(--radius-sm);cursor:pointer;transition:border-color .15s"
+        id="pdf-opt-ringkasan-wrap">
+        <input type="checkbox" id="pdf-opt-ringkasan" checked style="width:16px;height:16px;accent-color:var(--primary)">
+        <div><div style="font-size:13px;font-weight:600;color:var(--text)">📊 Ringkasan Umum</div>
+          <div style="font-size:11px;color:var(--text-3)">Total anggaran, realisasi, % terserap (infografis)</div></div>
+      </label>
+      <label style="display:flex;align-items:center;gap:10px;padding:10px 12px;border:1.5px solid var(--border);border-radius:var(--radius-sm);cursor:pointer"
+        id="pdf-opt-sumber-wrap">
+        <input type="checkbox" id="pdf-opt-sumber" checked style="width:16px;height:16px;accent-color:var(--primary)">
+        <div><div style="font-size:13px;font-weight:600;color:var(--text)">💳 Realisasi per Sumber Dana</div>
+          <div style="font-size:11px;color:var(--text-3)">DD, ADD, PAD, PBH, DLL dengan progress bar</div></div>
+      </label>
+      <label style="display:flex;align-items:center;gap:10px;padding:10px 12px;border:1.5px solid var(--border);border-radius:var(--radius-sm);cursor:pointer"
+        id="pdf-opt-bidang-wrap">
+        <input type="checkbox" id="pdf-opt-bidang" checked style="width:16px;height:16px;accent-color:var(--primary)">
+        <div><div style="font-size:13px;font-weight:600;color:var(--text)">🗂️ Realisasi per Bidang</div>
+          <div style="font-size:11px;color:var(--text-3)">5 kartu bidang dengan donut chart</div></div>
+      </label>
+      <label style="display:flex;align-items:center;gap:10px;padding:10px 12px;border:1.5px solid var(--border);border-radius:var(--radius-sm);cursor:pointer"
+        id="pdf-opt-kegiatan-wrap">
+        <input type="checkbox" id="pdf-opt-kegiatan" checked style="width:16px;height:16px;accent-color:var(--primary)">
+        <div><div style="font-size:13px;font-weight:600;color:var(--text)">📋 Realisasi per Kegiatan</div>
+          <div style="font-size:11px;color:var(--text-3)">Tabel lengkap semua kegiatan RAB</div></div>
+      </label>
+      <label style="display:flex;align-items:center;gap:10px;padding:10px 12px;border:1.5px solid var(--border);border-radius:var(--radius-sm);cursor:pointer"
+        id="pdf-opt-pajak-wrap">
+        <input type="checkbox" id="pdf-opt-pajak" checked style="width:16px;height:16px;accent-color:var(--primary)">
+        <div><div style="font-size:13px;font-weight:600;color:var(--text)">🧾 Laporan Pajak</div>
+          <div style="font-size:11px;color:var(--text-3)">Rekap pajak, status lunas/belum</div></div>
+      </label>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center;margin-bottom:14px">
+      <button class="btn btn-ghost btn-sm" onclick="setPDFAll(true)">✓ Pilih Semua</button>
+      <button class="btn btn-ghost btn-sm" onclick="setPDFAll(false)">✕ Hapus Semua</button>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('modal-pdf-options')">Batal</button>
+      <button class="btn btn-primary" onclick="exportLaporanPDF()">📄 Export PDF</button>
+    </div>
+  </div>
+</div>
 </body>
 </html>
 
