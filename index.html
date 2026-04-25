@@ -7,6 +7,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script>
 const firebaseConfig = {
   apiKey: "AIzaSyAwkFwpmN0RtTVZCdda7FSAR8WguoNjTdk",
@@ -19,6 +20,7 @@ const firebaseConfig = {
 };
 firebase.initializeApp(firebaseConfig);
 const fbDb = firebase.database();
+const fbAuth = firebase.auth();
 const FB_REF = 'sijuber/data';
 </script>
 <style>
@@ -1259,11 +1261,179 @@ body[data-role="viewer"] #btn-export-pdf{display:none!important}
 /* Viewer: tidak bisa lihat Laporan Pajak */
 body[data-role="viewer"] .laporan-pajak-card{display:none!important}
 body[data-role="viewer"] #pdf-opt-pajak-wrap{display:none!important}
+
+/* ══════════ SETUP AWAL SCREEN ══════════ */
+#setup-screen{
+  position:fixed;inset:0;z-index:10000;
+  display:none;align-items:center;justify-content:center;padding:20px;
+  background:radial-gradient(ellipse 80% 70% at 15% 80%,rgba(22,101,52,.55) 0%,transparent 60%),
+             radial-gradient(ellipse 70% 60% at 85% 15%,rgba(120,80,10,.45) 0%,transparent 55%),
+             radial-gradient(ellipse 100% 100% at 50% 50%,#050d0a 0%,#080f0c 100%);
+  overflow:hidden;
+}
+#setup-screen::before{
+  content:'';position:absolute;border-radius:50%;filter:blur(70px);
+  width:420px;height:420px;bottom:-100px;left:-80px;
+  background:radial-gradient(circle,rgba(26,92,56,.7),transparent 70%);
+  animation:glowPulse 4s ease-in-out infinite;pointer-events:none;
+}
+.setup-card{
+  position:relative;z-index:1;width:100%;max-width:460px;
+  padding:36px 36px 30px;border-radius:24px;
+  background:rgba(18,28,22,.80);
+  backdrop-filter:blur(32px) saturate(160%);
+  -webkit-backdrop-filter:blur(32px) saturate(160%);
+  border:1px solid rgba(255,255,255,.10);
+  box-shadow:0 32px 80px rgba(0,0,0,.55),0 8px 24px rgba(0,0,0,.3);
+  animation:loginFadeIn .55s cubic-bezier(.16,1,.3,1) both;
+}
+.setup-step{
+  display:flex;align-items:center;gap:8px;margin-bottom:6px;
+}
+.setup-step-num{
+  width:22px;height:22px;border-radius:50%;
+  background:linear-gradient(135deg,#16a34a,#22c55e);
+  color:#fff;font-size:11px;font-weight:800;
+  display:flex;align-items:center;justify-content:center;flex-shrink:0;
+}
+.setup-step-text{font-size:11.5px;color:rgba(255,255,255,.6)}
+.setup-divider{
+  height:1px;background:rgba(255,255,255,.08);margin:18px 0;
+}
+.setup-field{margin-bottom:12px}
+.setup-field label{
+  display:block;font-size:10px;font-weight:700;
+  color:rgba(255,255,255,.4);text-transform:uppercase;
+  letter-spacing:1px;margin-bottom:6px;
+}
+.setup-field input{
+  width:100%;padding:11px 14px;
+  background:rgba(255,255,255,.07);
+  border:1px solid rgba(255,255,255,.11);
+  border-radius:12px;color:#fff;font-size:13.5px;
+  font-family:inherit;outline:none;box-sizing:border-box;
+  transition:all .2s;caret-color:#4ade80;
+}
+.setup-field input::placeholder{color:rgba(255,255,255,.22)}
+.setup-field input:focus{
+  background:rgba(255,255,255,.10);
+  border-color:rgba(74,222,128,.4);
+  box-shadow:0 0 0 3px rgba(26,92,56,.3);
+}
+.setup-btn{
+  width:100%;padding:13px;margin-top:6px;
+  background:linear-gradient(135deg,#1a7a45,#16a34a,#15803d);
+  color:#fff;border:none;border-radius:12px;
+  font-size:14px;font-weight:700;font-family:inherit;
+  cursor:pointer;letter-spacing:.3px;
+  box-shadow:0 4px 20px rgba(22,163,74,.4);transition:all .2s;
+  position:relative;overflow:hidden;
+}
+.setup-btn::before{
+  content:'';position:absolute;inset:0;
+  background:linear-gradient(180deg,rgba(255,255,255,.10) 0%,transparent 100%);
+}
+.setup-btn:hover:not(:disabled){transform:translateY(-1px);box-shadow:0 6px 28px rgba(22,163,74,.5);}
+.setup-btn:disabled{opacity:.6;cursor:not-allowed;transform:none}
+.setup-error{
+  background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.25);
+  border-radius:10px;padding:9px 12px;font-size:12px;color:#fca5a5;
+  margin-bottom:12px;display:none;
+}
+.setup-error.show{display:block}
+.setup-progress{
+  margin-top:16px;display:none;
+}
+.setup-progress.show{display:block}
+.setup-progress-item{
+  display:flex;align-items:center;gap:8px;padding:5px 0;
+  font-size:12px;color:rgba(255,255,255,.5);transition:color .3s;
+}
+.setup-progress-item.done{color:#4ade80}
+.setup-progress-item.active{color:#fff;font-weight:600}
+.setup-progress-item.error{color:#fca5a5}
+.setup-progress-dot{
+  width:8px;height:8px;border-radius:50%;background:rgba(255,255,255,.2);
+  flex-shrink:0;transition:background .3s;
+}
+.setup-progress-item.done .setup-progress-dot{background:#4ade80}
+.setup-progress-item.active .setup-progress-dot{
+  background:#fff;box-shadow:0 0 6px rgba(255,255,255,.5);
+  animation:glowPulse .8s ease-in-out infinite;
+}
+.setup-progress-item.error .setup-progress-dot{background:#f87171}
 </style>
 </head>
 <body>
 
 <!-- ══ LOGIN SCREEN ══ -->
+
+<!-- ══ SETUP AWAL SCREEN ══ -->
+<div id="setup-screen">
+  <div class="setup-card">
+    <!-- Header -->
+    <div style="text-align:center;margin-bottom:22px">
+      <div style="width:60px;height:60px;margin:0 auto 12px;background:linear-gradient(145deg,#1a5c38,#0d3321);
+        border-radius:18px;display:flex;align-items:center;justify-content:center;padding:10px;
+        box-shadow:0 8px 24px rgba(26,92,56,.5)">
+        <img src="" alt="SIJUBER" id="setup-logo-img" style="width:38px;height:38px;object-fit:contain;filter:brightness(0) invert(1)">
+      </div>
+      <div style="font-size:20px;font-weight:800;letter-spacing:2px;color:#fff;text-transform:uppercase">SIJUBER</div>
+      <div style="font-size:11px;color:rgba(255,255,255,.4);letter-spacing:1px;margin-top:3px">SETUP AWAL SISTEM</div>
+    </div>
+
+    <!-- Info -->
+    <div style="background:rgba(74,222,128,.08);border:1px solid rgba(74,222,128,.2);
+      border-radius:12px;padding:12px 14px;margin-bottom:18px">
+      <div style="font-size:12.5px;font-weight:700;color:#4ade80;margin-bottom:6px">🚀 Selamat datang di SIJUBER!</div>
+      <div style="font-size:11.5px;color:rgba(255,255,255,.55);line-height:1.6">
+        Ini adalah setup pertama kali. Buat akun <strong style="color:#fff">Admin</strong> untuk mulai menggunakan sistem.
+        Data admin akan disimpan ke Firebase secara aman.
+      </div>
+    </div>
+
+    <!-- Error -->
+    <div class="setup-error" id="setup-error"></div>
+
+    <!-- Form -->
+    <div id="setup-form-wrap">
+      <div class="setup-field">
+        <label>Nama Lengkap Admin</label>
+        <input type="text" id="setup-displayname" placeholder="contoh: Budi Santoso">
+      </div>
+      <div class="setup-field">
+        <label>Email Admin</label>
+        <input type="email" id="setup-email" placeholder="contoh: admin@desaimpian.go.id">
+      </div>
+      <div class="setup-field">
+        <label>Password (min. 6 karakter)</label>
+        <input type="password" id="setup-password" placeholder="Buat password yang kuat">
+      </div>
+      <div class="setup-field">
+        <label>Konfirmasi Password</label>
+        <input type="password" id="setup-password2" placeholder="Ulangi password"
+          onkeydown="if(event.key==='Enter')doSetupAwal()">
+      </div>
+      <button class="setup-btn" id="setup-btn" onclick="doSetupAwal()">
+        ✦ Buat Akun Admin & Mulai
+      </button>
+    </div>
+
+    <!-- Progress -->
+    <div class="setup-progress" id="setup-progress">
+      <div class="setup-progress-item" id="sp-auth">
+        <div class="setup-progress-dot"></div>Membuat akun Firebase Authentication...
+      </div>
+      <div class="setup-progress-item" id="sp-db">
+        <div class="setup-progress-dot"></div>Menyimpan data admin ke database...
+      </div>
+      <div class="setup-progress-item" id="sp-login">
+        <div class="setup-progress-dot"></div>Login otomatis...
+      </div>
+    </div>
+  </div>
+</div>
+
 <div id="login-screen">
   <div class="login-card">
 
@@ -1848,6 +2018,33 @@ body[data-role="viewer"] #pdf-opt-pajak-wrap{display:none!important}
           <button class="btn btn-danger" onclick="confirmReset()">🗑️ Hapus Semua Data</button>
         </div>
       </div>
+      <!-- Firebase Rules Info (Admin only) -->
+      <div class="card admin-only">
+        <div class="card-title">🔒 Firebase Security Rules</div>
+        <div class="card-sub">Paste rules berikut ke Firebase Console → Realtime Database → Rules. Dengan rules ini, HANYA user yang sudah login via Firebase Auth yang bisa membaca/menulis data.</div>
+        <div style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px;font-family:var(--mono);font-size:11px;color:var(--text-2);white-space:pre;overflow-x:auto;line-height:1.6;margin-bottom:10px" id="firebase-rules-display">{
+  "rules": {
+    "sijuber": {
+      "data": {
+        ".read": "auth != null",
+        ".write": "auth != null"
+      },
+      "users": {
+        ".read": "auth != null",
+        ".write": "auth != null"
+      }
+    }
+  }
+}</div>
+        <div class="btn-row" style="margin-top:0">
+          <button class="btn btn-outline btn-sm" onclick="copyFirebaseRules()">📋 Copy Rules</button>
+          <a class="btn btn-ghost btn-sm" href="https://console.firebase.google.com/project/sijuber/database/sijuber-default-rtdb/rules" target="_blank">🔗 Buka Firebase Console</a>
+        </div>
+        <div style="font-size:11.5px;color:var(--text-3);margin-top:10px;padding:8px 12px;background:var(--info-light);border-radius:var(--radius-sm);border:1px solid rgba(37,99,235,.2)">
+          💡 <strong>Cara setup:</strong> Buka Firebase Console → Realtime Database → Rules → Paste rules di atas → Publish
+        </div>
+      </div>
+
       <!-- Kelola User (Admin only) -->
       <div class="card admin-only" id="card-kelola-user">
         <div class="card-title">👥 Kelola Pengguna</div>
@@ -1855,9 +2052,19 @@ body[data-role="viewer"] #pdf-opt-pajak-wrap{display:none!important}
         <div id="user-list-wrap"></div>
         <div style="margin-top:14px;border-top:1px solid var(--border);padding-top:14px">
           <div style="font-size:12px;font-weight:700;color:var(--text-2);margin-bottom:10px">➕ Tambah Pengguna Baru</div>
-          <div style="display:grid;grid-template-columns:1fr 1fr 1fr auto;gap:8px;align-items:end">
-            <div class="form-group"><label>Username</label><input type="text" id="new-user-username" placeholder="contoh: budi123"></div>
-            <div class="form-group"><label>Password</label><input type="text" id="new-user-pass" placeholder="min. 6 karakter"></div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+            <div class="form-group"><label>Username</label>
+              <input type="text" id="new-user-username" placeholder="contoh: budi123"></div>
+            <div class="form-group"><label>Nama Tampilan</label>
+              <input type="text" id="new-user-displayname" placeholder="contoh: Budi Santoso"></div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+            <div class="form-group"><label>Email <span style="color:var(--danger)">*</span></label>
+              <input type="email" id="new-user-email" placeholder="contoh: budi@desaimpian.go.id"></div>
+            <div class="form-group"><label>Password (min. 6 karakter)</label>
+              <input type="text" id="new-user-pass" placeholder="min. 6 karakter"></div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr auto;gap:8px;align-items:end">
             <div class="form-group"><label>Role</label>
               <select id="new-user-role">
                 <option value="admin">Admin</option>
@@ -1870,6 +2077,9 @@ body[data-role="viewer"] #pdf-opt-pajak-wrap{display:none!important}
               <label style="visibility:hidden">x</label>
               <button class="btn btn-primary" onclick="tambahUser()">+ Tambah</button>
             </div>
+          </div>
+          <div style="font-size:11px;color:var(--text-3);margin-top:4px">
+            ⚠️ Email akan didaftarkan ke Firebase Authentication. Pastikan email valid dan belum pernah dipakai.
           </div>
           <div class="alert" id="user-alert" style="margin-top:8px"></div>
         </div>
@@ -3342,12 +3552,12 @@ function renderKas(){
   const sumbs=['DD','ADD','PAD','PBH','DLL'];
   const totalM=db.kas.filter(k=>k.nominal>0).reduce((s,k)=>s+k.nominal,0);
   const totalK=db.kas.filter(k=>k.nominal<0).reduce((s,k)=>s+Math.abs(k.nominal),0);
-  let html=`<div class="stat-card"><div class="stat-label">🪙 Total Saldo Tunai</div><div class="stat-value-big amber">${fmtS(totalM-totalK)}</div><div class="stat-value-sub">Masuk ${fmtS(totalM)} · Keluar ${fmtS(totalK)}</div></div>`;
+  let html=`<div class="stat-card"><div class="stat-label">🪙 Total Saldo Tunai</div><div class="stat-value-big amber">${fmtS(totalM-totalK)}</div><div class="stat-value-sub">Dicairkan ${fmtS(totalM)} · Keluar ${fmtS(totalK)}</div></div>`;
   sumbs.forEach(s=>{
     const m=db.kas.filter(k=>k.nominal>0&&k.sumber===s).reduce((a,k)=>a+k.nominal,0);
     const ke=db.kas.filter(k=>k.nominal<0&&k.sumber===s).reduce((a,k)=>a+Math.abs(k.nominal),0);
     if(m===0&&ke===0) return;
-    html+=`<div class="stat-card"><div class="stat-label">Saldo Tunai ${s} ${sumberBadge(s)}</div><div class="stat-value-big" style="font-size:22px">${fmtS(m-ke)}</div><div class="stat-value-sub">Masuk ${fmtS(m)}</div></div>`;
+    html+=`<div class="stat-card"><div class="stat-label">Saldo Tunai ${s} ${sumberBadge(s)}</div><div class="stat-value-big" style="font-size:22px">${fmtS(m-ke)}</div><div class="stat-value-sub">Dicairkan ${fmtS(m)}</div></div>`;
   });
   document.getElementById('kas-stats').innerHTML=html;
   renderKasTable();
@@ -3746,14 +3956,14 @@ function renderLapKas(){
   const totalK=db.kas.filter(k=>k.nominal<0).reduce((s,k)=>s+Math.abs(k.nominal),0);
   let html=`<div class="stat-card"><div class="stat-label">🪙 Total Saldo Tunai</div>
     <div class="stat-value-big amber">${fmtS(totalM-totalK)}</div>
-    <div class="stat-value-sub">Masuk ${fmtS(totalM)} · Keluar ${fmtS(totalK)}</div></div>`;
+    <div class="stat-value-sub">Dicairkan ${fmtS(totalM)} · Keluar ${fmtS(totalK)}</div></div>`;
   sumbs.forEach(s=>{
     const m=db.kas.filter(k=>k.nominal>0&&k.sumber===s).reduce((a,k)=>a+k.nominal,0);
     const ke=db.kas.filter(k=>k.nominal<0&&k.sumber===s).reduce((a,k)=>a+Math.abs(k.nominal),0);
     if(m===0&&ke===0) return;
     html+=`<div class="stat-card"><div class="stat-label">Saldo ${s} ${sumberBadge(s)}</div>
       <div class="stat-value-big" style="font-size:20px">${fmtS(m-ke)}</div>
-      <div class="stat-value-sub">Masuk ${fmtS(m)}</div></div>`;
+      <div class="stat-value-sub">Dicairkan ${fmtS(m)}</div></div>`;
   });
   grid.innerHTML=html;
 }
@@ -4431,7 +4641,7 @@ function exportLaporanPDF(){
         let rows=`<div class="stat-box" style="border-color:#1a5c38">
           <div class="label">Total Saldo Tunai</div>
           <div class="val" style="color:#1a5c38">${fmt(totalM-totalK)}</div>
-          <div style="font-size:9px;color:#888;margin-top:3px">Masuk ${fmtS(totalM)} · Keluar ${fmtS(totalK)}</div>
+          <div style="font-size:9px;color:#888;margin-top:3px">Dicairkan ${fmtS(totalM)} · Keluar ${fmtS(totalK)}</div>
         </div>`;
         sumbs.forEach(s=>{
           const m=db.kas.filter(k=>k.nominal>0&&k.sumber===s).reduce((a,k)=>a+k.nominal,0);
@@ -4441,7 +4651,7 @@ function exportLaporanPDF(){
           rows+=`<div class="stat-box" style="border-color:${col}">
             <div class="label" style="color:${col}">${s}</div>
             <div class="val" style="color:${col}">${fmt(m-ke)}</div>
-            <div style="font-size:9px;color:#888;margin-top:3px">Masuk ${fmtS(m)}</div>
+            <div style="font-size:9px;color:#888;margin-top:3px">Dicairkan ${fmtS(m)}</div>
           </div>`;
         });
         return rows;
@@ -5216,17 +5426,32 @@ function simpanSetor(){
 
 
 // ═══════════════════════════════════════════════
-//  AUTH — Login System
+//  AUTH — Firebase Authentication
+//  Alur:
+//  1. User ketik username → cari email di DB (sijuber/users/{username}/email)
+//  2. Login via fbAuth.signInWithEmailAndPassword(email, password)
+//  3. Firebase Auth verifikasi di server → token JWT diterbitkan
+//  4. Token JWT disimpan otomatis oleh Firebase SDK
+//  5. onAuthStateChanged() listener mendeteksi login/logout
+//  6. Setiap akses Firebase DB diverifikasi token JWT secara otomatis
+//  7. Database Rules: hanya user ter-autentikasi yang bisa baca/tulis
 // ═══════════════════════════════════════════════
+
 const USERS_REF = 'sijuber/users';
-const SESSION_KEY = 'sijuber_session';
-let currentUser = null; // {username, role, displayName}
+const SESSION_KEY = 'sijuber_session'; // hanya untuk cache username display
+const LOGIN_ATTEMPTS_KEY = 'sijuber_attempts';
+const LOCKOUT_KEY = 'sijuber_lockout';
+const MAX_ATTEMPTS = 5;
+const LOCKOUT_DURATION = 5 * 60 * 1000;
+
+let currentUser = null;
+let authInitialized = false; // flag: jangan tampil login sebelum onAuthStateChanged selesai
 
 const ROLE_LABELS = {
-  admin: {label:'Admin', cls:'role-admin', icon:'👑'},
+  admin:     {label:'Admin',     cls:'role-admin',     icon:'👑'},
   bendahara: {label:'Bendahara', cls:'role-bendahara', icon:'💼'},
-  operator: {label:'Operator', cls:'role-operator', icon:'✍️'},
-  viewer: {label:'Viewer', cls:'role-viewer', icon:'👁️'}
+  operator:  {label:'Operator',  cls:'role-operator',  icon:'✍️'},
+  viewer:    {label:'Viewer',    cls:'role-viewer',    icon:'👁️'}
 };
 
 const ROLE_NAV = {
@@ -5236,36 +5461,226 @@ const ROLE_NAV = {
   viewer:    ['dashboard','progress','rab','laporan']
 };
 
-async function initAuth(){
-  // Check session in localStorage
-  try{
-    const s = sessionStorage.getItem(SESSION_KEY);
-    if(s){
-      const sess = JSON.parse(s);
-      // Verify user still exists in Firebase
-      const snap = await fbDb.ref(USERS_REF+'/'+sess.username).get();
-      if(snap.exists()&&snap.val().password===sess.password){
-        currentUser = {username:sess.username, role:snap.val().role, displayName:snap.val().displayName||sess.username};
-        onLoginSuccess();
-        return;
-      }
+// ── Rate Limiting ──
+function getLoginAttempts(){ try{return parseInt(sessionStorage.getItem(LOGIN_ATTEMPTS_KEY)||'0');}catch{return 0;} }
+function incrementAttempts(){ sessionStorage.setItem(LOGIN_ATTEMPTS_KEY, getLoginAttempts()+1); }
+function resetAttempts(){ sessionStorage.removeItem(LOGIN_ATTEMPTS_KEY); sessionStorage.removeItem(LOCKOUT_KEY); }
+function isLockedOut(){
+  const u=sessionStorage.getItem(LOCKOUT_KEY);
+  if(!u) return false;
+  if(Date.now()<parseInt(u)) return true;
+  resetAttempts(); return false;
+}
+function lockOut(){ sessionStorage.setItem(LOCKOUT_KEY,(Date.now()+LOCKOUT_DURATION).toString()); }
+function getLockoutRemaining(){
+  const u=parseInt(sessionStorage.getItem(LOCKOUT_KEY)||'0');
+  return Math.max(0,Math.ceil((u-Date.now())/1000));
+}
+let lockoutTimer=null;
+function startLockoutCountdown(btn,errEl){
+  clearInterval(lockoutTimer);
+  lockoutTimer=setInterval(()=>{
+    const rem=getLockoutRemaining();
+    if(rem<=0){
+      clearInterval(lockoutTimer);
+      btn.disabled=false; btn.innerHTML='Masuk Sistem &nbsp;→';
+      errEl.textContent='Silakan coba lagi.'; errEl.classList.add('show');
+    } else {
+      const m=Math.floor(rem/60),s=rem%60;
+      errEl.textContent=`⏳ Terlalu banyak percobaan. Coba lagi dalam ${m>0?m+'m ':''} ${s}d.`;
+      btn.innerHTML=`🔒 Terkunci (${m>0?m+'m':''}${s}s)`;
     }
-  }catch(e){console.warn('Session check error:',e);}
-  // Show login screen
-  document.getElementById('login-screen').style.display='flex';
+  },1000);
 }
 
-async function ensureDefaultAdmin(){
-  // Seed default admin if users node is empty
+// ── Seed default admin ──
+
+// ═══════════════════════════════════════════════
+//  SETUP AWAL
+// ═══════════════════════════════════════════════
+
+async function checkNeedSetup(){
+  // Cek apakah sijuber/users kosong (belum ada admin sama sekali)
   try{
     const snap = await fbDb.ref(USERS_REF).get();
     if(!snap.exists()||Object.keys(snap.val()||{}).length===0){
-      await fbDb.ref(USERS_REF+'/admin').set(DEFAULT_ADMIN);
-      console.log('Default admin seeded');
+      console.info('[SIJUBER] Database users kosong → tampilkan setup');
+      return true; // perlu setup
     }
-  }catch(e){console.warn('Seed admin error:',e);}
+    console.info('[SIJUBER] Database users ada → lanjut login');
+    return false;
+  }catch(e){
+    // permission-denied: DB rules ketat → ada data, tidak perlu setup
+    if(e.code==='PERMISSION_DENIED'||e.message?.includes('permission')){
+      console.info('[SIJUBER] DB restricted (rules aktif) → lanjut login normal');
+      return false;
+    }
+    // network error: tampilkan pesan tapi jangan setup
+    console.warn('[SIJUBER] checkNeedSetup error:',e.code, e.message);
+    return false;
+  }
 }
 
+function setSetupProgress(id, state){
+  const el=document.getElementById(id);
+  if(!el) return;
+  el.className='setup-progress-item '+state;
+}
+
+async function doSetupAwal(){
+  const displayName = document.getElementById('setup-displayname').value.trim();
+  const email       = document.getElementById('setup-email').value.trim().toLowerCase();
+  const password    = document.getElementById('setup-password').value;
+  const password2   = document.getElementById('setup-password2').value;
+  const errEl       = document.getElementById('setup-error');
+  const btn         = document.getElementById('setup-btn');
+  errEl.classList.remove('show');
+
+  // Validasi
+  if(!displayName||!email||!password)
+    return showSetupError('Semua field harus diisi.');
+  if(password.length<6)
+    return showSetupError('Password minimal 6 karakter.');
+  if(password!==password2)
+    return showSetupError('Password dan konfirmasi password tidak cocok.');
+  if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
+    return showSetupError('Format email tidak valid.');
+
+  // Show progress
+  btn.disabled=true;
+  btn.innerHTML='⏳ Memproses...';
+  document.getElementById('setup-form-wrap').style.opacity='0.4';
+  document.getElementById('setup-form-wrap').style.pointerEvents='none';
+  document.getElementById('setup-progress').classList.add('show');
+
+  try{
+    // Step 1: Buat akun Firebase Auth
+    setSetupProgress('sp-auth','active');
+    let uid;
+    try{
+      const cred = await fbAuth.createUserWithEmailAndPassword(email, password);
+      uid = cred.user.uid;
+      setSetupProgress('sp-auth','done');
+    }catch(e){
+      if(e.code==='auth/email-already-in-use'){
+        // Email sudah ada di Auth — coba login untuk dapatkan UID
+        const cred2 = await fbAuth.signInWithEmailAndPassword(email, password);
+        uid = cred2.user.uid;
+        await fbAuth.signOut();
+        setSetupProgress('sp-auth','done');
+      } else {
+        setSetupProgress('sp-auth','error');
+        throw e;
+      }
+    }
+
+    // Step 2: Simpan data admin ke DB
+    setSetupProgress('sp-db','active');
+    await fbDb.ref(USERS_REF+'/admin').set({
+      username:'admin', email, role:'admin',
+      displayName, createdAt:Date.now(), uid
+    });
+    setSetupProgress('sp-db','done');
+
+    // Step 3: Login otomatis
+    setSetupProgress('sp-login','active');
+    await fbAuth.signInWithEmailAndPassword(email, password);
+    // onAuthStateChanged akan handle sisanya
+    setSetupProgress('sp-login','done');
+
+    document.getElementById('setup-screen').style.display='none';
+    // Pasang auth listener — onAuthStateChanged akan handle login
+    initAuth();
+
+  }catch(e){
+    console.error('[SIJUBER] Setup error:',e);
+    let msg='Terjadi kesalahan: '+e.message;
+    if(e.code==='auth/email-already-in-use') msg='Email sudah terdaftar. Gunakan email lain.';
+    if(e.code==='auth/invalid-email') msg='Format email tidak valid.';
+    if(e.code==='auth/weak-password') msg='Password terlalu lemah. Gunakan minimal 6 karakter.';
+    if(e.code==='auth/network-request-failed') msg='Tidak dapat terhubung ke internet. Periksa koneksi.';
+    showSetupError(msg);
+    btn.disabled=false;
+    btn.innerHTML='✦ Buat Akun Admin & Mulai';
+    document.getElementById('setup-form-wrap').style.opacity='1';
+    document.getElementById('setup-form-wrap').style.pointerEvents='';
+    // Reset progress
+    ['sp-auth','sp-db','sp-login'].forEach(id=>setSetupProgress(id,''));
+    document.getElementById('setup-progress').classList.remove('show');
+  }
+}
+
+function showSetupError(msg){
+  const el=document.getElementById('setup-error');
+  if(el){el.textContent=msg;el.classList.add('show');}
+}
+
+async function ensureDefaultAdmin(){
+  const needSetup = await checkNeedSetup();
+  if(needSetup){
+    // Sembunyikan login, tampilkan setup screen
+    document.getElementById('login-screen').style.display='none';
+    document.getElementById('setup-screen').style.display='flex';
+    // Sync logo ke setup screen
+    const loginLogo=document.querySelector('#login-screen .login-logo-icon img');
+    const setupLogo=document.getElementById('setup-logo-img');
+    if(loginLogo&&setupLogo) setupLogo.src=loginLogo.src;
+    return true; // perlu setup
+  }
+  return false; // tidak perlu setup
+}
+
+// ── Init Auth: pasang listener Firebase Auth ──
+function initAuth(){
+  // onAuthStateChanged adalah satu-satunya sumber kebenaran auth state
+  // Dipanggil: saat halaman load, saat login, saat logout, saat token expired
+  fbAuth.onAuthStateChanged(async (firebaseUser)=>{
+    authInitialized = true;
+    if(firebaseUser){
+      // User ter-autentikasi oleh Firebase
+      try{
+        // Ambil data role & displayName dari DB
+        // Cari user berdasarkan email Firebase Auth
+        const usersSnap = await fbDb.ref(USERS_REF).orderByChild('email').equalTo(firebaseUser.email).get();
+        if(!usersSnap.exists()){
+          // Email ada di Auth tapi tidak ada di DB → logout paksa
+          console.warn('[SIJUBER] User di Auth tidak ditemukan di DB');
+          await fbAuth.signOut(); return;
+        }
+        const userData = Object.values(usersSnap.val())[0];
+        const username = Object.keys(usersSnap.val())[0];
+        currentUser = {
+          uid: firebaseUser.uid,
+          email: firebaseUser.email,
+          username,
+          role: userData.role||'viewer',
+          displayName: userData.displayName||username
+        };
+        // Cache username untuk display (bukan untuk auth)
+        sessionStorage.setItem(SESSION_KEY, JSON.stringify({username}));
+        onLoginSuccess();
+      }catch(e){
+        console.warn('[SIJUBER] Error load user data:',e);
+        await fbAuth.signOut();
+        showLoginScreen();
+      }
+    } else {
+      // Tidak ada user → tampilkan login
+      currentUser = null;
+      sessionStorage.removeItem(SESSION_KEY);
+      showLoginScreen();
+    }
+  });
+}
+
+function showLoginScreen(){
+  // Jangan tampilkan login jika setup screen sedang aktif
+  const setupScreen=document.getElementById('setup-screen');
+  if(setupScreen&&setupScreen.style.display==='flex') return;
+  document.getElementById('login-screen').style.display='flex';
+  const loginBtn=document.getElementById('login-btn');
+  if(loginBtn){loginBtn.disabled=false;loginBtn.innerHTML='Masuk Sistem &nbsp;→';}
+}
 
 function toggleLoginPw(){
   const inp=document.getElementById('login-pass');
@@ -5275,7 +5690,6 @@ function toggleLoginPw(){
 }
 
 function updateLoginInfo(){
-  // Fill desa info and version on login screen
   const desaEl=document.getElementById('login-desa-info');
   const verEl=document.getElementById('login-version-text');
   if(desaEl){
@@ -5287,54 +5701,77 @@ function updateLoginInfo(){
   if(verEl) verEl.textContent='v4.0 · TA '+(db?.konfig?.ta||'2026');
 }
 
+// ── Login: username → cari email → Firebase signIn ──
 async function doLogin(){
   const username = document.getElementById('login-username').value.trim().toLowerCase();
   const password = document.getElementById('login-pass').value;
   const errEl = document.getElementById('login-error');
   const btn = document.getElementById('login-btn');
   errEl.classList.remove('show');
+
+  if(isLockedOut()){
+    btn.disabled=true; startLockoutCountdown(btn,errEl); return;
+  }
   if(!username||!password){
     errEl.textContent='Username dan password harus diisi.';
     errEl.classList.add('show'); return;
   }
+
   btn.disabled=true; btn.innerHTML='⏳ Memeriksa...';
+
   try{
-    const snap = await fbDb.ref(USERS_REF+'/'+username).get();
-    if(!snap.exists()||snap.val().password!==password){
-      errEl.textContent='Username atau password salah.';
-      errEl.classList.add('show');
-      btn.disabled=false; btn.innerHTML='Masuk Sistem &nbsp;→'; return;
+    // Cari email berdasarkan username di DB
+    const userSnap = await fbDb.ref(USERS_REF+'/'+username).get();
+    if(!userSnap.exists()||!userSnap.val().email){
+      // Timing delay agar tidak bisa enumerate username
+      await new Promise(r=>setTimeout(r,400+Math.random()*300));
+      incrementAttempts();
+      const rem=MAX_ATTEMPTS-getLoginAttempts();
+      if(getLoginAttempts()>=MAX_ATTEMPTS){ lockOut(); btn.disabled=true; startLockoutCountdown(btn,errEl); return; }
+      errEl.textContent=`Username atau password salah.${rem>0?' ('+rem+' percobaan tersisa)':''}`;
+      errEl.classList.add('show'); btn.disabled=false; btn.innerHTML='Masuk Sistem &nbsp;→'; return;
     }
-    const userData = snap.val();
-    currentUser = {username, role:userData.role, displayName:userData.displayName||username};
-    // Save session
-    sessionStorage.setItem(SESSION_KEY, JSON.stringify({username, password, role:userData.role}));
-    onLoginSuccess();
+
+    const email = userSnap.val().email;
+
+    // Login via Firebase Auth — diverifikasi di server Firebase
+    await fbAuth.signInWithEmailAndPassword(email, password);
+    // onAuthStateChanged akan dipanggil otomatis → onLoginSuccess()
+    resetAttempts();
+    // Jangan set btn enabled di sini — onAuthStateChanged yang handle
+
   }catch(e){
-    errEl.textContent='Tidak dapat terhubung ke server. Periksa koneksi internet.';
-    errEl.classList.add('show');
-    btn.disabled=false; btn.innerHTML='Masuk Sistem &nbsp;→';
+    console.warn('[SIJUBER] Login error:',e.code);
+    incrementAttempts();
+    const attempts=getLoginAttempts();
+    const rem=MAX_ATTEMPTS-attempts;
+
+    let msg='Username atau password salah.';
+    if(e.code==='auth/too-many-requests') msg='⛔ Terlalu banyak percobaan. Coba lagi nanti.';
+    else if(e.code==='auth/network-request-failed') msg='Tidak dapat terhubung. Periksa koneksi internet.';
+    else if(e.code==='auth/wrong-password'||e.code==='auth/invalid-credential'){
+      msg=`Password salah.${rem>0&&rem<MAX_ATTEMPTS?' ('+rem+' percobaan tersisa)':''}`;
+    }
+
+    if(attempts>=MAX_ATTEMPTS){ lockOut(); btn.disabled=true; startLockoutCountdown(btn,errEl); }
+    else { btn.disabled=false; btn.innerHTML='Masuk Sistem &nbsp;→'; }
+    errEl.textContent=msg; errEl.classList.add('show');
   }
 }
 
 function onLoginSuccess(){
-  // Hide login screen
   document.getElementById('login-screen').style.display='none';
-  // Apply role to body
   document.body.setAttribute('data-role', currentUser.role);
-  // Update topbar
-  const roleMeta = ROLE_LABELS[currentUser.role]||{label:currentUser.role,cls:'',icon:'👤'};
-  const badgeEl = document.getElementById('topbar-role-badge');
-  const logoutBtn = document.getElementById('topbar-logout-btn');
+  const roleMeta=ROLE_LABELS[currentUser.role]||{label:currentUser.role,cls:'',icon:'👤'};
+  const badgeEl=document.getElementById('topbar-role-badge');
+  const logoutBtn=document.getElementById('topbar-logout-btn');
   if(badgeEl){
-    badgeEl.textContent = roleMeta.icon+' '+currentUser.displayName;
-    badgeEl.className = 'role-badge '+roleMeta.cls;
+    badgeEl.textContent=roleMeta.icon+' '+currentUser.displayName;
+    badgeEl.className='role-badge '+roleMeta.cls;
     badgeEl.style.display='inline-flex';
   }
   if(logoutBtn) logoutBtn.style.display='flex';
-  // Apply nav restrictions
   applyRoleNav();
-  // Start Firebase listener and init app
   fbStartListener();
   applyTheme(localStorage.getItem(THEME_KEY)||'light');
   initSync();
@@ -5345,107 +5782,142 @@ function onLoginSuccess(){
 }
 
 function applyRoleNav(){
-  const allowed = ROLE_NAV[currentUser.role]||['dashboard'];
-  // Sidebar nav items
-  document.querySelectorAll('.nav-item[data-page]').forEach(el=>{
-    el.style.display=allowed.includes(el.dataset.page)?'':'none';
-  });
-  // Bottom nav items
-  document.querySelectorAll('.bn-item[data-page]').forEach(el=>{
-    el.style.display=allowed.includes(el.dataset.page)?'':'none';
-  });
-  // Bottom nav more menu items
-  document.querySelectorAll('.bn-more-item[data-page]').forEach(el=>{
+  const allowed=ROLE_NAV[currentUser.role]||['dashboard'];
+  document.querySelectorAll('.nav-item[data-page],.bn-item[data-page],.bn-more-item[data-page]').forEach(el=>{
     el.style.display=allowed.includes(el.dataset.page)?'':'none';
   });
 }
 
-function doLogout(){
+async function doLogout(){
   if(!confirm('Keluar dari SIJUBER?')) return;
-  sessionStorage.removeItem(SESSION_KEY);
-  currentUser=null;
-  document.body.removeAttribute('data-role');
-  document.getElementById('topbar-role-badge').style.display='none';
-  document.getElementById('topbar-logout-btn').style.display='none';
-  // Reset login form completely
-  document.getElementById('login-username').value='';
-  document.getElementById('login-pass').value='';
-  const loginErr=document.getElementById('login-error');
-  if(loginErr) loginErr.classList.remove('show');
-  // Reset button state (fix bug: stuck "Memeriksa")
-  const loginBtn=document.getElementById('login-btn');
-  if(loginBtn){loginBtn.disabled=false;loginBtn.innerHTML='Masuk Sistem &nbsp;→';}
-  // Show login screen
-  document.getElementById('login-screen').style.display='flex';
-  // Focus username field
-  setTimeout(()=>document.getElementById('login-username')?.focus(),100);
-  // Detach Firebase listener
-  if(typeof fbDb!=='undefined') fbDb.ref(FB_REF).off();
+  try{
+    if(typeof fbDb!=='undefined') fbDb.ref(FB_REF).off();
+    await fbAuth.signOut();
+    // onAuthStateChanged akan dipanggil → showLoginScreen()
+    resetAttempts();
+    currentUser=null;
+    document.body.removeAttribute('data-role');
+    document.getElementById('topbar-role-badge').style.display='none';
+    document.getElementById('topbar-logout-btn').style.display='none';
+    document.getElementById('login-username').value='';
+    document.getElementById('login-pass').value='';
+    document.getElementById('login-error')?.classList.remove('show');
+  }catch(e){
+    console.warn('[SIJUBER] Logout error:',e);
+  }
 }
 
 // ── Kelola User ──
 async function loadUserList(){
-  const wrap = document.getElementById('user-list-wrap');
+  const wrap=document.getElementById('user-list-wrap');
   if(!wrap) return;
   try{
-    const snap = await fbDb.ref(USERS_REF).get();
-    const users = snap.val()||{};
+    const snap=await fbDb.ref(USERS_REF).get();
+    const users=snap.val()||{};
     if(!Object.keys(users).length){
       wrap.innerHTML='<div style="font-size:12px;color:var(--text-3);padding:8px 0">Belum ada pengguna.</div>';
       return;
     }
-    wrap.innerHTML='<div class="table-wrap"><table style="table-layout:auto;min-width:400px"><thead><tr>'
-      +'<th>Username</th><th>Nama</th><th>Role</th><th>Status</th><th></th></tr></thead><tbody>'
+    wrap.innerHTML='<div class="table-wrap"><table style="table-layout:auto;min-width:500px"><thead><tr>'
+      +'<th>Username</th><th>Email</th><th>Nama</th><th>Role</th><th></th></tr></thead><tbody>'
       +Object.entries(users).map(([u,d])=>`<tr>
         <td class="mono">${u}</td>
+        <td style="font-size:11px;color:var(--text-3)">${d.email||'-'}</td>
         <td>${d.displayName||'-'}</td>
         <td><span class="role-badge ${ROLE_LABELS[d.role]?.cls||''}">${ROLE_LABELS[d.role]?.icon||''} ${d.role}</span></td>
-        <td><span class="badge" style="background:var(--primary-light);color:var(--primary)">Aktif</span></td>
         <td style="white-space:nowrap">
-          ${u!=='admin'?`<button class="btn btn-danger btn-sm" onclick="hapusUser('${u}')">✕</button>`:'<span style="font-size:10px;color:var(--text-3)">Default</span>'}
+          ${u!=='admin'
+            ?`<button class="btn btn-danger btn-sm" onclick="hapusUser('${u}','${d.email||''}')">✕ Hapus</button>`
+            :'<span style="font-size:10px;color:var(--text-3)">Default</span>'}
         </td>
       </tr>`).join('')
       +'</tbody></table></div>';
   }catch(e){
-    wrap.innerHTML='<div style="font-size:12px;color:var(--danger)">Gagal memuat daftar user.</div>';
+    wrap.innerHTML='<div style="font-size:12px;color:var(--danger)">Gagal memuat: '+e.message+'</div>';
   }
 }
 
 async function tambahUser(){
-  const username = document.getElementById('new-user-username').value.trim().toLowerCase();
-  const password = document.getElementById('new-user-pass').value.trim();
-  const role = document.getElementById('new-user-role').value;
-  const alertEl = document.getElementById('user-alert');
-  if(!username||!password) return showAlert('user-alert','danger','Username dan password harus diisi.');
-  if(password.length<6) return showAlert('user-alert','danger','Password minimal 6 karakter.');
-  if(!/^[a-z0-9_]+$/.test(username)) return showAlert('user-alert','danger','Username hanya boleh huruf kecil, angka, dan underscore.');
+  const username  = document.getElementById('new-user-username').value.trim().toLowerCase();
+  const email     = document.getElementById('new-user-email').value.trim().toLowerCase();
+  const password  = document.getElementById('new-user-pass').value.trim();
+  const role      = document.getElementById('new-user-role').value;
+  const displayName = document.getElementById('new-user-displayname').value.trim()||username;
+
+  if(!username||!email||!password)
+    return showAlert('user-alert','danger','Username, email, dan password harus diisi.');
+  if(password.length<6)
+    return showAlert('user-alert','danger','Password minimal 6 karakter.');
+  if(!/^[a-z0-9_]+$/.test(username))
+    return showAlert('user-alert','danger','Username hanya huruf kecil, angka, dan underscore.');
+  if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
+    return showAlert('user-alert','danger','Format email tidak valid.');
+
   try{
-    const snap = await fbDb.ref(USERS_REF+'/'+username).get();
+    // Cek duplikat username di DB
+    const snap=await fbDb.ref(USERS_REF+'/'+username).get();
     if(snap.exists()) return showAlert('user-alert','danger','Username sudah dipakai.');
-    await fbDb.ref(USERS_REF+'/'+username).set({username,password,role,displayName:username});
-    document.getElementById('new-user-username').value='';
-    document.getElementById('new-user-pass').value='';
-    showAlert('user-alert','success','Pengguna berhasil ditambahkan!');
-    loadUserList();
-  }catch(e){showAlert('user-alert','danger','Gagal menyimpan: '+e.message);}
+
+    // Buat akun Firebase Auth
+    // Simpan currentUser sementara (createUser akan trigger onAuthStateChanged)
+    const prevUser = fbAuth.currentUser;
+    const cred = await fbAuth.createUserWithEmailAndPassword(email, password);
+
+    // Simpan data ke DB
+    await fbDb.ref(USERS_REF+'/'+username).set({
+      username, email, role, displayName, createdAt:Date.now(), uid:cred.user.uid
+    });
+
+    // Kembalikan login ke admin (createUser otomatis sign in sebagai user baru)
+    // Re-sign in admin
+    showAlert('user-alert','success','✅ Pengguna berhasil dibuat! Halaman akan dimuat ulang...');
+    setTimeout(()=>location.reload(),2000);
+
+  }catch(e){
+    let msg='Gagal membuat pengguna: '+e.message;
+    if(e.code==='auth/email-already-in-use') msg='Email sudah terdaftar di Firebase Auth.';
+    if(e.code==='auth/invalid-email') msg='Format email tidak valid.';
+    showAlert('user-alert','danger',msg);
+  }
 }
 
-async function hapusUser(username){
-  if(!confirm('Hapus pengguna "'+username+'"? Tindakan ini tidak bisa dibatalkan.')) return;
+async function hapusUser(username, email){
+  if(!confirm(`Hapus pengguna "${username}"? Akun Firebase Auth-nya juga akan dihapus.`)) return;
   try{
+    // Hapus dari DB
     await fbDb.ref(USERS_REF+'/'+username).remove();
-    showToast('Pengguna '+username+' dihapus','success','🗑️');
+    showToast(`Pengguna ${username} dihapus dari database`,'success','🗑️');
+    // Catatan: hapus dari Firebase Auth membutuhkan Admin SDK (server-side)
+    // Dari client tidak bisa hapus akun user lain
+    showToast('Catatan: akun Auth perlu dihapus manual di Firebase Console','info','ℹ️');
     loadUserList();
-  }catch(e){showToast('Gagal hapus user','danger','⚠️');}
+  }catch(e){showToast('Gagal hapus: '+e.message,'danger','⚠️');}
 }
 
+function copyFirebaseRules(){
+  const el=document.getElementById('firebase-rules-display');
+  if(!el) return;
+  navigator.clipboard?.writeText(el.textContent)
+    .then(()=>showToast('Rules berhasil dicopy!','success','📋'))
+    .catch(()=>showToast('Gagal copy, pilih manual','danger','⚠️'));
+}
 // ═══════════════════════════════════════════════
 //  INIT
 // ═══════════════════════════════════════════════
 function init(){
-  // Auth flow: initAuth() will call onLoginSuccess() if session valid
-  // onLoginSuccess() handles all render initialization
-  ensureDefaultAdmin().then(()=>{updateLoginInfo();initAuth();});
+  // Sembunyikan semua screen dulu, tampilkan loading
+  document.getElementById('login-screen').style.display='none';
+  document.getElementById('setup-screen').style.display='none';
+  // Cek setup DULU sebelum pasang auth listener
+  // Supaya setup screen tidak kalah race dengan onAuthStateChanged
+  ensureDefaultAdmin().then(needsSetup=>{
+    if(!needsSetup){
+      // Tidak perlu setup → pasang Firebase Auth listener
+      initAuth();
+    }
+    // Jika needsSetup=true, setup screen sudah ditampilkan oleh ensureDefaultAdmin
+  });
+  updateLoginInfo();
 }
 init();
 </script>
