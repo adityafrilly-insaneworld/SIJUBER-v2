@@ -1456,7 +1456,7 @@ body[data-role="viewer"] #pdf-opt-pajak-wrap{display:none!important}
       <div class="login-input-wrap">
         <span class="login-input-icon">👤</span>
         <input type="text" id="login-username"
-          placeholder="NIP / ID Petugas"
+          placeholder="Ketik username (contoh: admin)"
           autocomplete="username"
           onkeydown="if(event.key==='Enter')document.getElementById('login-pass').focus()">
       </div>
@@ -5500,25 +5500,43 @@ function startLockoutCountdown(btn,errEl){
 // ═══════════════════════════════════════════════
 
 async function checkNeedSetup(){
-  // Cek apakah sijuber/users kosong (belum ada admin sama sekali)
   try{
     const snap = await fbDb.ref(USERS_REF).get();
     if(!snap.exists()||Object.keys(snap.val()||{}).length===0){
-      console.info('[SIJUBER] Database users kosong → tampilkan setup');
-      return true; // perlu setup
+      return true; // DB kosong → perlu setup
     }
-    console.info('[SIJUBER] Database users ada → lanjut login');
-    return false;
+    return false; // ada user → login biasa
   }catch(e){
-    // permission-denied: DB rules ketat → ada data, tidak perlu setup
-    if(e.code==='PERMISSION_DENIED'||e.message?.includes('permission')){
-      console.info('[SIJUBER] DB restricted (rules aktif) → lanjut login normal');
+    // PERMISSION_DENIED: rules ketat, tidak bisa cek sebelum login
+    // Tampilkan tombol setup manual di login screen
+    if(e.code==='PERMISSION_DENIED'||e.message?.toLowerCase().includes('permission')){
+      showSetupButton(); // tampilkan tombol "Setup Awal" di login screen
       return false;
     }
-    // network error: tampilkan pesan tapi jangan setup
-    console.warn('[SIJUBER] checkNeedSetup error:',e.code, e.message);
     return false;
   }
+}
+
+// Tampilkan tombol "Perlu Setup Awal?" di bawah form login
+function showSetupButton(){
+  const existing=document.getElementById('setup-trigger-btn');
+  if(existing) return; // sudah ada
+  const loginCard=document.querySelector('.login-card');
+  if(!loginCard) return;
+  const btn=document.createElement('button');
+  btn.id='setup-trigger-btn';
+  btn.onclick=()=>{ 
+    document.getElementById('login-screen').style.display='none';
+    document.getElementById('setup-screen').style.display='flex';
+    const loginLogo=document.querySelector('#login-screen .login-logo-icon img');
+    const setupLogo=document.getElementById('setup-logo-img');
+    if(loginLogo&&setupLogo) setupLogo.src=loginLogo.src;
+  };
+  btn.style.cssText='width:100%;padding:9px;margin-top:10px;background:transparent;border:1px solid rgba(255,255,255,.15);border-radius:10px;color:rgba(255,255,255,.45);font-size:12px;cursor:pointer;font-family:inherit;transition:all .2s';
+  btn.onmouseenter=()=>btn.style.color='rgba(255,255,255,.8)';
+  btn.onmouseleave=()=>btn.style.color='rgba(255,255,255,.45)';
+  btn.textContent='🚀 Belum punya akun? Setup Awal';
+  loginCard.appendChild(btn);
 }
 
 function setSetupProgress(id, state){
@@ -5618,16 +5636,14 @@ function showSetupError(msg){
 async function ensureDefaultAdmin(){
   const needSetup = await checkNeedSetup();
   if(needSetup){
-    // Sembunyikan login, tampilkan setup screen
     document.getElementById('login-screen').style.display='none';
     document.getElementById('setup-screen').style.display='flex';
-    // Sync logo ke setup screen
     const loginLogo=document.querySelector('#login-screen .login-logo-icon img');
     const setupLogo=document.getElementById('setup-logo-img');
     if(loginLogo&&setupLogo) setupLogo.src=loginLogo.src;
-    return true; // perlu setup
+    return true;
   }
-  return false; // tidak perlu setup
+  return false;
 }
 
 // ── Init Auth: pasang listener Firebase Auth ──
@@ -5746,11 +5762,14 @@ async function doLogin(){
     const attempts=getLoginAttempts();
     const rem=MAX_ATTEMPTS-attempts;
 
+    const eCode = e?.code||e?.message||'unknown';
     let msg='Username atau password salah.';
-    if(e.code==='auth/too-many-requests') msg='⛔ Terlalu banyak percobaan. Coba lagi nanti.';
-    else if(e.code==='auth/network-request-failed') msg='Tidak dapat terhubung. Periksa koneksi internet.';
-    else if(e.code==='auth/wrong-password'||e.code==='auth/invalid-credential'){
+    if(eCode.includes('too-many-requests')) msg='⛔ Terlalu banyak percobaan. Coba lagi nanti.';
+    else if(eCode.includes('network')) msg='Tidak dapat terhubung. Periksa koneksi internet.';
+    else if(eCode.includes('wrong-password')||eCode.includes('invalid-credential')||eCode.includes('invalid-login-credentials')){
       msg=`Password salah.${rem>0&&rem<MAX_ATTEMPTS?' ('+rem+' percobaan tersisa)':''}`;
+    } else if(eCode.includes('user-not-found')){
+      msg='Username tidak ditemukan.';
     }
 
     if(attempts>=MAX_ATTEMPTS){ lockOut(); btn.disabled=true; startLockoutCountdown(btn,errEl); }
@@ -5905,17 +5924,14 @@ function copyFirebaseRules(){
 //  INIT
 // ═══════════════════════════════════════════════
 function init(){
-  // Sembunyikan semua screen dulu, tampilkan loading
-  document.getElementById('login-screen').style.display='none';
-  document.getElementById('setup-screen').style.display='none';
-  // Cek setup DULU sebelum pasang auth listener
-  // Supaya setup screen tidak kalah race dengan onAuthStateChanged
+  const loginEl=document.getElementById('login-screen');
+  const setupEl=document.getElementById('setup-screen');
+  if(loginEl) loginEl.style.display='none';
+  if(setupEl) setupEl.style.display='none';
   ensureDefaultAdmin().then(needsSetup=>{
-    if(!needsSetup){
-      // Tidak perlu setup → pasang Firebase Auth listener
-      initAuth();
-    }
-    // Jika needsSetup=true, setup screen sudah ditampilkan oleh ensureDefaultAdmin
+    if(!needsSetup) initAuth();
+  }).catch(()=>{
+    if(loginEl) loginEl.style.display='flex';
   });
   updateLoginInfo();
 }
