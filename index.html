@@ -5500,17 +5500,22 @@ function startLockoutCountdown(btn,errEl){
 // ═══════════════════════════════════════════════
 
 async function checkNeedSetup(){
+  // Jika pernah setup sebelumnya, jangan tampilkan setup lagi
+  if(localStorage.getItem('sijuber_setup_done')==='1') return false;
+
   try{
     const snap = await fbDb.ref(USERS_REF).get();
     if(!snap.exists()||Object.keys(snap.val()||{}).length===0){
       return true; // DB kosong → perlu setup
     }
-    return false; // ada user → login biasa
+    // Ada data → tandai setup sudah selesai
+    localStorage.setItem('sijuber_setup_done','1');
+    return false;
   }catch(e){
-    // PERMISSION_DENIED: rules ketat, tidak bisa cek sebelum login
-    // Tampilkan tombol setup manual di login screen
     if(e.code==='PERMISSION_DENIED'||e.message?.toLowerCase().includes('permission')){
-      showSetupButton(); // tampilkan tombol "Setup Awal" di login screen
+      // Rules ketat = sudah ada data (setup sudah dilakukan)
+      // Jangan tampilkan setup button, langsung ke login
+      localStorage.setItem('sijuber_setup_done','1');
       return false;
     }
     return false;
@@ -5623,6 +5628,10 @@ async function doSetupAwal(){
     setSetupProgress('sp-login','done');
 
     document.getElementById('setup-screen').style.display='none';
+    // Tandai setup sudah selesai agar tidak muncul lagi
+    localStorage.setItem('sijuber_setup_done','1');
+    // Hapus tombol setup dari login card jika ada
+    document.getElementById('setup-trigger-btn')?.remove();
     // Pasang auth listener — onAuthStateChanged akan handle login
     initAuth();
 
@@ -5669,18 +5678,46 @@ function initAuth(){
   fbAuth.onAuthStateChanged(async (firebaseUser)=>{
     authInitialized = true;
     if(firebaseUser){
-      // User ter-autentikasi oleh Firebase
       try{
-        // Ambil data role & displayName dari DB
-        // Cari user berdasarkan email Firebase Auth
-        const usersSnap = await fbDb.ref(USERS_REF).orderByChild('email').equalTo(firebaseUser.email).get();
-        if(!usersSnap.exists()){
-          // Email ada di Auth tapi tidak ada di DB → logout paksa
-          console.warn('[SIJUBER] User di Auth tidak ditemukan di DB');
+        // Strategi: coba ambil username dari sessionStorage dulu (lebih cepat, tidak perlu index)
+        let username = null;
+        let userData = null;
+
+        const cached = sessionStorage.getItem(SESSION_KEY);
+        if(cached){
+          try{
+            const parsed = JSON.parse(cached);
+            if(parsed.username){
+              // Verifikasi langsung via path username (tidak perlu orderByChild)
+              const snap = await fbDb.ref(USERS_REF+'/'+parsed.username).get();
+              if(snap.exists() && snap.val().email === firebaseUser.email){
+                username = parsed.username;
+                userData = snap.val();
+              }
+            }
+          }catch{}
+        }
+
+        // Fallback: scan semua user dan cari yang emailnya cocok
+        if(!username){
+          const allSnap = await fbDb.ref(USERS_REF).get();
+          if(allSnap.exists()){
+            const allUsers = allSnap.val();
+            for(const [uname, udata] of Object.entries(allUsers)){
+              if(udata.email === firebaseUser.email){
+                username = uname;
+                userData = udata;
+                break;
+              }
+            }
+          }
+        }
+
+        if(!username || !userData){
+          console.warn('[SIJUBER] User Auth tidak ditemukan di DB, logout paksa');
           await fbAuth.signOut(); return;
         }
-        const userData = Object.values(usersSnap.val())[0];
-        const username = Object.keys(usersSnap.val())[0];
+
         currentUser = {
           uid: firebaseUser.uid,
           email: firebaseUser.email,
@@ -5688,16 +5725,32 @@ function initAuth(){
           role: userData.role||'viewer',
           displayName: userData.displayName||username
         };
-        // Cache username untuk display (bukan untuk auth)
         sessionStorage.setItem(SESSION_KEY, JSON.stringify({username}));
         onLoginSuccess();
       }catch(e){
-        console.warn('[SIJUBER] Error load user data:',e);
+        console.warn('[SIJUBER] Error load user data:',e.message);
+        // Jika error karena rules, coba tanpa verifikasi DB (darurat)
+        if(e.message?.includes('permission')||e.code==='PERMISSION_DENIED'){
+          const cached = sessionStorage.getItem(SESSION_KEY);
+          if(cached){
+            try{
+              const parsed = JSON.parse(cached);
+              currentUser = {
+                uid: firebaseUser.uid,
+                email: firebaseUser.email,
+                username: parsed.username||'user',
+                role: 'viewer', // fallback aman
+                displayName: parsed.username||'User'
+              };
+              onLoginSuccess();
+              return;
+            }catch{}
+          }
+        }
         await fbAuth.signOut();
         showLoginScreen();
       }
     } else {
-      // Tidak ada user → tampilkan login
       currentUser = null;
       sessionStorage.removeItem(SESSION_KEY);
       showLoginScreen();
@@ -5766,6 +5819,8 @@ async function doLogin(){
 
     const email = userSnap.val().email;
 
+    // Cache username sebelum signIn agar onAuthStateChanged bisa pakai langsung
+    sessionStorage.setItem(SESSION_KEY, JSON.stringify({username}));
     // Login via Firebase Auth — diverifikasi di server Firebase
     await fbAuth.signInWithEmailAndPassword(email, password);
     // onAuthStateChanged akan dipanggil otomatis → onLoginSuccess()
@@ -5967,6 +6022,8 @@ async function doSyncAkun(){
       createdAt: Date.now(), uid
     });
     showAlert('sync-akun-alert','success','✅ Akun berhasil disinkronkan! Masuk otomatis...');
+    localStorage.setItem('sijuber_setup_done','1');
+    document.getElementById('setup-trigger-btn')?.remove();
     closeModal('modal-sync-akun');
     // onAuthStateChanged akan handle login
   }catch(e){
