@@ -5537,6 +5537,14 @@ function showSetupButton(){
   btn.onmouseleave=()=>btn.style.color='rgba(255,255,255,.45)';
   btn.textContent='🚀 Belum punya akun? Setup Awal';
   loginCard.appendChild(btn);
+  // Tombol sync untuk user yang sudah ada di Auth tapi belum di DB
+  const syncBtn=document.createElement('button');
+  syncBtn.style.cssText='width:100%;padding:8px;margin-top:6px;background:transparent;border:1px solid rgba(255,255,255,.10);border-radius:10px;color:rgba(255,255,255,.3);font-size:11px;cursor:pointer;font-family:inherit;transition:all .2s';
+  syncBtn.onmouseenter=()=>syncBtn.style.color='rgba(255,255,255,.6)';
+  syncBtn.onmouseleave=()=>syncBtn.style.color='rgba(255,255,255,.3)';
+  syncBtn.onclick=()=>document.getElementById('modal-sync-akun').classList.add('open');
+  syncBtn.textContent='🔗 Sudah punya akun Firebase? Sync ke database';
+  loginCard.appendChild(syncBtn);
 }
 
 function setSetupProgress(id, state){
@@ -5581,11 +5589,19 @@ async function doSetupAwal(){
       setSetupProgress('sp-auth','done');
     }catch(e){
       if(e.code==='auth/email-already-in-use'){
-        // Email sudah ada di Auth — coba login untuk dapatkan UID
-        const cred2 = await fbAuth.signInWithEmailAndPassword(email, password);
-        uid = cred2.user.uid;
-        await fbAuth.signOut();
-        setSetupProgress('sp-auth','done');
+        // Email sudah ada di Auth — login untuk dapatkan UID lalu sinkron ke DB
+        try{
+          const cred2 = await fbAuth.signInWithEmailAndPassword(email, password);
+          uid = cred2.user.uid;
+          // Jangan signOut — biarkan masuk, onAuthStateChanged akan handle
+          setSetupProgress('sp-auth','done');
+        }catch(loginErr){
+          setSetupProgress('sp-auth','error');
+          if(loginErr.code==='auth/wrong-password'){
+            throw new Error('Email sudah terdaftar tapi password salah. Gunakan password yang sama dengan saat mendaftar di Firebase Console.');
+          }
+          throw loginErr;
+        }
       } else {
         setSetupProgress('sp-auth','error');
         throw e;
@@ -5857,11 +5873,11 @@ async function loadUserList(){
 }
 
 async function tambahUser(){
-  const username  = document.getElementById('new-user-username').value.trim().toLowerCase();
-  const email     = document.getElementById('new-user-email').value.trim().toLowerCase();
-  const password  = document.getElementById('new-user-pass').value.trim();
-  const role      = document.getElementById('new-user-role').value;
-  const displayName = document.getElementById('new-user-displayname').value.trim()||username;
+  const username   = document.getElementById('new-user-username').value.trim().toLowerCase();
+  const email      = document.getElementById('new-user-email').value.trim().toLowerCase();
+  const password   = document.getElementById('new-user-pass').value.trim();
+  const role       = document.getElementById('new-user-role').value;
+  const displayName= document.getElementById('new-user-displayname').value.trim()||username;
 
   if(!username||!email||!password)
     return showAlert('user-alert','danger','Username, email, dan password harus diisi.');
@@ -5877,26 +5893,89 @@ async function tambahUser(){
     const snap=await fbDb.ref(USERS_REF+'/'+username).get();
     if(snap.exists()) return showAlert('user-alert','danger','Username sudah dipakai.');
 
-    // Buat akun Firebase Auth
-    // Simpan currentUser sementara (createUser akan trigger onAuthStateChanged)
-    const prevUser = fbAuth.currentUser;
-    const cred = await fbAuth.createUserWithEmailAndPassword(email, password);
+    showAlert('user-alert','info','⏳ Membuat akun...');
 
-    // Simpan data ke DB
+    // Gunakan Secondary Firebase App agar tidak mengusir session admin
+    // Secondary app: instance terpisah hanya untuk createUser
+    let uid;
+    let secondaryApp=null;
+    try{
+      // Buat secondary app dengan nama unik
+      const appName='sijuber-secondary-'+Date.now();
+      secondaryApp = firebase.initializeApp(firebaseConfig, appName);
+      const secondaryAuth = firebase.auth(secondaryApp);
+
+      // Buat user via secondary auth — tidak mempengaruhi auth utama
+      const cred = await secondaryAuth.createUserWithEmailAndPassword(email, password);
+      uid = cred.user.uid;
+
+      // Logout secondary auth dan hapus app
+      await secondaryAuth.signOut();
+      await secondaryApp.delete();
+      secondaryApp=null;
+
+    }catch(authErr){
+      if(secondaryApp) await secondaryApp.delete().catch(()=>{});
+      throw authErr; // lempar ke catch utama
+    }
+
+    // Simpan data ke Realtime DB
     await fbDb.ref(USERS_REF+'/'+username).set({
-      username, email, role, displayName, createdAt:Date.now(), uid:cred.user.uid
+      username, email, role, displayName,
+      createdAt: Date.now(), uid
     });
 
-    // Kembalikan login ke admin (createUser otomatis sign in sebagai user baru)
-    // Re-sign in admin
-    showAlert('user-alert','success','✅ Pengguna berhasil dibuat! Halaman akan dimuat ulang...');
-    setTimeout(()=>location.reload(),2000);
+    // Reset form
+    ['new-user-username','new-user-email','new-user-pass','new-user-displayname']
+      .forEach(id=>{const el=document.getElementById(id);if(el) el.value='';});
+
+    showAlert('user-alert','success',
+      `✅ Pengguna <strong>${username}</strong> (${role}) berhasil dibuat!`);
+    loadUserList(); // refresh tabel tanpa reload halaman
 
   }catch(e){
-    let msg='Gagal membuat pengguna: '+e.message;
-    if(e.code==='auth/email-already-in-use') msg='Email sudah terdaftar di Firebase Auth.';
-    if(e.code==='auth/invalid-email') msg='Format email tidak valid.';
+    let msg='Gagal membuat pengguna: '+(e.message||e);
+    if(e.code==='auth/email-already-in-use') msg='❌ Email sudah terdaftar di Firebase Auth.';
+    if(e.code==='auth/invalid-email') msg='❌ Format email tidak valid.';
+    if(e.code==='auth/weak-password') msg='❌ Password terlalu lemah (minimal 6 karakter).';
     showAlert('user-alert','danger',msg);
+  }
+}
+
+
+// ── Sync akun Auth → DB ──
+async function doSyncAkun(){
+  const username    = document.getElementById('sync-username').value.trim().toLowerCase();
+  const email       = document.getElementById('sync-email').value.trim().toLowerCase();
+  const password    = document.getElementById('sync-password').value;
+  const displayName = document.getElementById('sync-displayname').value.trim()||username;
+  const role        = document.getElementById('sync-role').value;
+
+  if(!username||!email||!password)
+    return showAlert('sync-akun-alert','danger','Semua field wajib diisi.');
+  if(!/^[a-z0-9_]+$/.test(username))
+    return showAlert('sync-akun-alert','danger','Username hanya huruf kecil, angka, underscore.');
+
+  try{
+    showAlert('sync-akun-alert','info','⏳ Menghubungkan akun...');
+    // Login ke Firebase Auth dulu
+    const cred = await fbAuth.signInWithEmailAndPassword(email, password);
+    const uid  = cred.user.uid;
+    // Simpan data ke DB
+    await fbDb.ref(USERS_REF+'/'+username).set({
+      username, email, role, displayName,
+      createdAt: Date.now(), uid
+    });
+    showAlert('sync-akun-alert','success','✅ Akun berhasil disinkronkan! Masuk otomatis...');
+    closeModal('modal-sync-akun');
+    // onAuthStateChanged akan handle login
+  }catch(e){
+    let msg = 'Gagal: '+(e.message||e);
+    if(e.code==='auth/wrong-password'||e.code==='auth/invalid-credential')
+      msg = '❌ Email atau password salah.';
+    if(e.code==='auth/user-not-found')
+      msg = '❌ Email belum terdaftar di Firebase Auth.';
+    showAlert('sync-akun-alert','danger',msg);
   }
 }
 
@@ -5986,6 +6065,46 @@ init();
     <div class="modal-footer">
       <button class="btn btn-outline" onclick="closeModal('modal-pdf-options')">Batal</button>
       <button class="btn btn-primary" onclick="exportLaporanPDF()">📄 Export PDF</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ MODAL: SYNC AKUN KE DB ══ -->
+<div class="modal-overlay" id="modal-sync-akun">
+  <div class="modal" style="max-width:420px">
+    <div class="modal-title">🔗 Sinkronisasi Akun ke Database</div>
+    <div class="modal-sub">Akun sudah ada di Firebase Auth tapi data belum tersimpan di database. Isi form ini untuk menghubungkannya.</div>
+    <div class="alert" id="sync-akun-alert"></div>
+    <div class="form-grid cols1" style="gap:10px">
+      <div class="form-group">
+        <label>Username yang diinginkan</label>
+        <input type="text" id="sync-username" placeholder="contoh: admin">
+      </div>
+      <div class="form-group">
+        <label>Email (yang terdaftar di Firebase Auth)</label>
+        <input type="email" id="sync-email" placeholder="email yang dipakai saat daftar">
+      </div>
+      <div class="form-group">
+        <label>Password</label>
+        <input type="password" id="sync-password" placeholder="password Firebase Auth">
+      </div>
+      <div class="form-group">
+        <label>Nama Tampilan</label>
+        <input type="text" id="sync-displayname" placeholder="Nama lengkap">
+      </div>
+      <div class="form-group">
+        <label>Role</label>
+        <select id="sync-role">
+          <option value="admin">Admin</option>
+          <option value="bendahara">Bendahara</option>
+          <option value="operator">Operator</option>
+          <option value="viewer">Viewer</option>
+        </select>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('modal-sync-akun')">Batal</button>
+      <button class="btn btn-primary" onclick="doSyncAkun()">🔗 Sinkronkan Akun</button>
     </div>
   </div>
 </div>
