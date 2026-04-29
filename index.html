@@ -1398,6 +1398,16 @@ body[data-role="viewer"] #pdf-opt-pajak-wrap{display:none!important}
     <!-- Form -->
     <div id="setup-form-wrap">
       <div class="setup-field">
+        <label>Username Admin</label>
+        <input type="text" id="setup-username" placeholder="contoh: admin"
+          autocomplete="username"
+          oninput="this.value=this.value.toLowerCase().replace(/[^a-z0-9_]/g,'')"
+          style="font-family:var(--mono,monospace);letter-spacing:.5px">
+        <div style="font-size:11px;color:rgba(255,255,255,.35);margin-top:4px">
+          Hanya huruf kecil, angka, dan underscore. Ini yang dipakai saat login.
+        </div>
+      </div>
+      <div class="setup-field">
         <label>Nama Lengkap Admin</label>
         <input type="text" id="setup-displayname" placeholder="contoh: Budi Santoso">
       </div>
@@ -1456,7 +1466,7 @@ body[data-role="viewer"] #pdf-opt-pajak-wrap{display:none!important}
       <div class="login-input-wrap">
         <span class="login-input-icon">👤</span>
         <input type="text" id="login-username"
-          placeholder="Ketik username (contoh: admin)"
+          placeholder="Username yang dibuat saat setup"
           autocomplete="username"
           onkeydown="if(event.key==='Enter')document.getElementById('login-pass').focus()">
       </div>
@@ -5500,24 +5510,24 @@ function startLockoutCountdown(btn,errEl){
 // ═══════════════════════════════════════════════
 
 async function checkNeedSetup(){
-  // Jika pernah setup sebelumnya, jangan tampilkan setup lagi
-  if(localStorage.getItem('sijuber_setup_done')==='1') return false;
-
+  // CATATAN: Tidak memakai localStorage sebagai gate utama.
+  // localStorage bisa tertinggal dari sesi sebelumnya meski DB sudah dikosongkan.
+  // Selalu cek ke DB secara langsung sebagai sumber kebenaran.
   try{
     const snap = await fbDb.ref(USERS_REF).get();
     if(!snap.exists()||Object.keys(snap.val()||{}).length===0){
+      localStorage.removeItem('sijuber_setup_done');
       return true; // DB kosong → perlu setup
     }
-    // Ada data → tandai setup sudah selesai
     localStorage.setItem('sijuber_setup_done','1');
     return false;
   }catch(e){
     if(e.code==='PERMISSION_DENIED'||e.message?.toLowerCase().includes('permission')){
-      // Rules ketat = sudah ada data (setup sudah dilakukan)
-      // Jangan tampilkan setup button, langsung ke login
-      localStorage.setItem('sijuber_setup_done','1');
+      // Rules ketat tapi mungkin DB baru dikosongkan — jangan auto-tandai selesai
+      console.warn('[SIJUBER] checkNeedSetup: PERMISSION_DENIED, tampilkan login.');
       return false;
     }
+    console.warn('[SIJUBER] checkNeedSetup error:', e.message);
     return false;
   }
 }
@@ -5559,6 +5569,7 @@ function setSetupProgress(id, state){
 }
 
 async function doSetupAwal(){
+  const username    = (document.getElementById('setup-username')?.value||'').trim().toLowerCase();
   const displayName = document.getElementById('setup-displayname').value.trim();
   const email       = document.getElementById('setup-email').value.trim().toLowerCase();
   const password    = document.getElementById('setup-password').value;
@@ -5568,6 +5579,10 @@ async function doSetupAwal(){
   errEl.classList.remove('show');
 
   // Validasi
+  if(!username)
+    return showSetupError('Username harus diisi.');
+  if(!/^[a-z0-9_]+$/.test(username))
+    return showSetupError('Username hanya boleh huruf kecil, angka, dan underscore.');
   if(!displayName||!email||!password)
     return showSetupError('Semua field harus diisi.');
   if(password.length<6)
@@ -5615,8 +5630,8 @@ async function doSetupAwal(){
 
     // Step 2: Simpan data admin ke DB
     setSetupProgress('sp-db','active');
-    await fbDb.ref(USERS_REF+'/admin').set({
-      username:'admin', email, role:'admin',
+    await fbDb.ref(USERS_REF+'/'+username).set({
+      username, email, role:'admin',
       displayName, createdAt:Date.now(), uid
     });
     setSetupProgress('sp-db','done');
@@ -6065,9 +6080,14 @@ function init(){
   if(loginEl) loginEl.style.display='none';
   if(setupEl) setupEl.style.display='none';
   ensureDefaultAdmin().then(needsSetup=>{
-    if(!needsSetup) initAuth();
-  }).catch(()=>{
+    if(!needsSetup){
+      initAuth();
+      showSetupButton(); // selalu ada tombol setup manual (untuk skenario reset DB)
+    }
+  }).catch((e)=>{
+    console.warn('[SIJUBER] init error:',e);
     if(loginEl) loginEl.style.display='flex';
+    showSetupButton();
   });
   updateLoginInfo();
 }
