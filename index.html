@@ -1403,8 +1403,7 @@ body[data-role="viewer"] #pdf-opt-pajak-wrap{display:none!important}
       </div>
       <div class="setup-field">
         <label>Email Admin</label>
-        <input type="email" id="setup-email" placeholder="contoh: admin@desaimpian.go.id"
-          autocomplete="email">
+        <input type="email" id="setup-email" placeholder="contoh: admin@desaimpian.go.id">
       </div>
       <div class="setup-field">
         <label>Password (min. 6 karakter)</label>
@@ -2051,39 +2050,13 @@ body[data-role="viewer"] #pdf-opt-pajak-wrap{display:none!important}
       <!-- Kelola User (Admin only) -->
       <div class="card admin-only" id="card-kelola-user">
         <div class="card-title">👥 Kelola Pengguna</div>
-        <div class="card-sub">Tambah, edit, dan hapus akun pengguna SIJUBER</div>
-        <div id="user-list-wrap"></div>
-        <div style="margin-top:14px;border-top:1px solid var(--border);padding-top:14px">
-          <div style="font-size:12px;font-weight:700;color:var(--text-2);margin-bottom:10px">➕ Tambah Pengguna Baru</div>
-          <div style="display:grid;grid-template-columns:1fr;gap:8px;margin-bottom:8px">
-            <div class="form-group"><label>Nama Tampilan</label>
-              <input type="text" id="new-user-displayname" placeholder="contoh: Budi Santoso"></div>
-          </div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
-            <div class="form-group"><label>Email <span style="color:var(--danger)">*</span></label>
-              <input type="email" id="new-user-email" placeholder="contoh: budi@desaimpian.go.id"></div>
-            <div class="form-group"><label>Password (min. 6 karakter)</label>
-              <input type="text" id="new-user-pass" placeholder="min. 6 karakter"></div>
-          </div>
-          <div style="display:grid;grid-template-columns:1fr auto;gap:8px;align-items:end">
-            <div class="form-group"><label>Role</label>
-              <select id="new-user-role">
-                <option value="admin">Admin</option>
-                <option value="bendahara" selected>Bendahara</option>
-                <option value="operator">Operator</option>
-                <option value="viewer">Viewer</option>
-              </select>
-            </div>
-            <div class="form-group" style="align-items:flex-end">
-              <label style="visibility:hidden">x</label>
-              <button class="btn btn-primary" onclick="tambahUser()">+ Tambah</button>
-            </div>
-          </div>
-          <div style="font-size:11px;color:var(--text-3);margin-top:4px">
-            ⚠️ Email akan didaftarkan ke Firebase Authentication. Pastikan email valid dan belum pernah dipakai.
-          </div>
-          <div class="alert" id="user-alert" style="margin-top:8px"></div>
+        <div class="card-sub">Kelola akses pengguna yang terdaftar di SIJUBER</div>
+        <div style="background:var(--info-light);border:1px solid rgba(37,99,235,.2);border-radius:var(--radius-sm);padding:10px 13px;font-size:12px;color:var(--info);margin-bottom:14px;display:flex;align-items:flex-start;gap:8px">
+          <span>ℹ️</span>
+          <span>Untuk menambah pengguna baru, daftarkan akun terlebih dahulu melalui halaman login (Setup Awal), lalu aktifkan aksesnya di sini.</span>
         </div>
+        <div id="user-list-wrap"></div>
+        <div class="alert" id="user-alert" style="margin-top:8px"></div>
       </div>
     </div>
   </div>
@@ -5429,16 +5402,17 @@ function simpanSetor(){
 // ═══════════════════════════════════════════════
 //  AUTH — Firebase Authentication
 //  Alur:
-//  1. User ketik email + password langsung ke Firebase Auth
-//  2. Firebase Auth verifikasi di server → token JWT diterbitkan
-//  3. Token JWT disimpan otomatis oleh Firebase SDK
-//  4. onAuthStateChanged() listener mendeteksi login/logout → cari data user di DB by email
-//  5. Setiap akses Firebase DB diverifikasi token JWT secara otomatis
-//  6. Database Rules: hanya user ter-autentikasi yang bisa baca/tulis
+//  1. User ketik username → cari email di DB (sijuber/users/{username}/email)
+//  2. Login via fbAuth.signInWithEmailAndPassword(email, password)
+//  3. Firebase Auth verifikasi di server → token JWT diterbitkan
+//  4. Token JWT disimpan otomatis oleh Firebase SDK
+//  5. onAuthStateChanged() listener mendeteksi login/logout
+//  6. Setiap akses Firebase DB diverifikasi token JWT secara otomatis
+//  7. Database Rules: hanya user ter-autentikasi yang bisa baca/tulis
 // ═══════════════════════════════════════════════
 
 const USERS_REF = 'sijuber/users';
-const SESSION_KEY = 'sijuber_session'; // cache uid untuk fallback darurat
+const SESSION_KEY = 'sijuber_session'; // hanya untuk cache username display
 const LOGIN_ATTEMPTS_KEY = 'sijuber_attempts';
 const LOCKOUT_KEY = 'sijuber_lockout';
 const MAX_ATTEMPTS = 5;
@@ -5500,7 +5474,6 @@ function startLockoutCountdown(btn,errEl){
 // ═══════════════════════════════════════════════
 
 async function checkNeedSetup(){
-  // Selalu cek DB langsung — jangan pakai localStorage sebagai gate
   try{
     const snap = await fbDb.ref(USERS_REF).get();
     if(!snap.exists()||Object.keys(snap.val()||{}).length===0){
@@ -5510,8 +5483,6 @@ async function checkNeedSetup(){
     localStorage.setItem('sijuber_setup_done','1');
     return false;
   }catch(e){
-    // PERMISSION_DENIED: rules aktif = DB punya data, atau DB benar-benar kosong
-    // Tampilkan login biasa + tombol setup manual
     console.warn('[SIJUBER] checkNeedSetup:', e.code||e.message);
     return false;
   }
@@ -5537,14 +5508,7 @@ function showSetupButton(){
   btn.onmouseleave=()=>btn.style.color='rgba(255,255,255,.45)';
   btn.textContent='🚀 Belum punya akun? Setup Awal';
   loginCard.appendChild(btn);
-  // Tombol sync untuk user yang sudah ada di Auth tapi belum di DB
-  const syncBtn=document.createElement('button');
-  syncBtn.style.cssText='width:100%;padding:8px;margin-top:6px;background:transparent;border:1px solid rgba(255,255,255,.10);border-radius:10px;color:rgba(255,255,255,.3);font-size:11px;cursor:pointer;font-family:inherit;transition:all .2s';
-  syncBtn.onmouseenter=()=>syncBtn.style.color='rgba(255,255,255,.6)';
-  syncBtn.onmouseleave=()=>syncBtn.style.color='rgba(255,255,255,.3)';
-  syncBtn.onclick=()=>document.getElementById('modal-sync-akun').classList.add('open');
-  syncBtn.textContent='🔗 Sudah punya akun Firebase? Sync ke database';
-  loginCard.appendChild(syncBtn);
+
 }
 
 function setSetupProgress(id, state){
@@ -5571,7 +5535,6 @@ async function doSetupAwal(){
     return showSetupError('Password dan konfirmasi password tidak cocok.');
   if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
     return showSetupError('Format email tidak valid.');
-  // username dihapus — sistem murni pakai email
 
   // Show progress
   btn.disabled=true;
@@ -5609,11 +5572,10 @@ async function doSetupAwal(){
       }
     }
 
-    // Step 2: Simpan data admin ke DB — key = uid (unik, stabil, tidak perlu lookup)
+    // Step 2: Simpan data admin ke DB — key = uid
     setSetupProgress('sp-db','active');
     await fbDb.ref(USERS_REF+'/'+uid).set({
-      email, role:'admin',
-      displayName, createdAt:Date.now(), uid
+      email, role:'admin', displayName, createdAt:Date.now(), uid, active:true
     });
     setSetupProgress('sp-db','done');
 
@@ -5626,7 +5588,9 @@ async function doSetupAwal(){
     document.getElementById('setup-screen').style.display='none';
     // Tandai setup sudah selesai agar tidak muncul lagi
     localStorage.setItem('sijuber_setup_done','1');
+    // Hapus tombol setup dari login card jika ada
     document.getElementById('setup-trigger-btn')?.remove();
+    // Pasang auth listener — onAuthStateChanged akan handle login
     initAuth();
 
   }catch(e){
@@ -5673,13 +5637,22 @@ function initAuth(){
     authInitialized = true;
     if(firebaseUser){
       try{
-        // Lookup langsung via UID — O(1), tidak perlu scan semua user
         const snap = await fbDb.ref(USERS_REF+'/'+firebaseUser.uid).get();
         if(!snap.exists()){
           console.warn('[SIJUBER] UID tidak ditemukan di DB, logout paksa');
           await fbAuth.signOut(); return;
         }
         const userData = snap.val();
+        // Cek akses dinonaktifkan (kecuali admin)
+        if(userData.active===false && userData.role!=='admin'){
+          await fbAuth.signOut();
+          showLoginScreen();
+          setTimeout(()=>{
+            const errEl=document.getElementById('login-error');
+            if(errEl){errEl.textContent='⛔ Akun Anda dinonaktifkan. Hubungi admin.';errEl.classList.add('show');}
+          },100);
+          return;
+        }
         currentUser = {
           uid: firebaseUser.uid,
           email: firebaseUser.email,
@@ -5691,7 +5664,6 @@ function initAuth(){
       }catch(e){
         console.warn('[SIJUBER] Error load user data:',e.message);
         if(e.message?.includes('permission')||e.code==='PERMISSION_DENIED'){
-          // Darurat: gunakan data minimal dari Auth
           currentUser = {
             uid: firebaseUser.uid,
             email: firebaseUser.email,
@@ -5742,7 +5714,7 @@ function updateLoginInfo(){
   if(verEl) verEl.textContent='v4.0 · TA '+(db?.konfig?.ta||'2026');
 }
 
-// ── Login: langsung pakai email + password ke Firebase Auth ──
+// ── Login: langsung email + password ke Firebase Auth ──
 async function doLogin(){
   const email    = (document.getElementById('login-email')?.value||'').trim().toLowerCase();
   const password = document.getElementById('login-pass').value;
@@ -5750,39 +5722,28 @@ async function doLogin(){
   const btn      = document.getElementById('login-btn');
   errEl.classList.remove('show');
 
-  if(isLockedOut()){
-    btn.disabled=true; startLockoutCountdown(btn,errEl); return;
-  }
+  if(isLockedOut()){ btn.disabled=true; startLockoutCountdown(btn,errEl); return; }
   if(!email||!password){
     errEl.textContent='Email dan password harus diisi.';
     errEl.classList.add('show'); return;
   }
-
   btn.disabled=true; btn.innerHTML='⏳ Memeriksa...';
-
   try{
-    // Langsung ke Firebase Auth — tidak perlu lookup DB dulu
     await fbAuth.signInWithEmailAndPassword(email, password);
-    // onAuthStateChanged → lookup user di DB by UID → onLoginSuccess()
     resetAttempts();
-
   }catch(e){
     console.warn('[SIJUBER] Login error:',e.code);
     incrementAttempts();
     const attempts=getLoginAttempts();
     const rem=MAX_ATTEMPTS-attempts;
-
-    const eCode = e?.code||e?.message||'unknown';
+    const eCode=e?.code||e?.message||'unknown';
     let msg='Email atau password salah.';
-    if(eCode.includes('too-many-requests')) msg='⛔ Terlalu banyak percobaan. Coba lagi nanti.';
-    else if(eCode.includes('network'))      msg='Tidak dapat terhubung. Periksa koneksi internet.';
+    if(eCode.includes('too-many-requests'))  msg='⛔ Terlalu banyak percobaan. Coba lagi nanti.';
+    else if(eCode.includes('network'))       msg='Tidak dapat terhubung. Periksa koneksi internet.';
     else if(eCode.includes('invalid-email')) msg='Format email tidak valid.';
-    else if(eCode.includes('wrong-password')||eCode.includes('invalid-credential')||eCode.includes('invalid-login-credentials')){
+    else if(eCode.includes('wrong-password')||eCode.includes('invalid-credential')||eCode.includes('invalid-login-credentials'))
       msg=`Email atau password salah.${rem>0&&rem<MAX_ATTEMPTS?' ('+rem+' percobaan tersisa)':''}`;
-    } else if(eCode.includes('user-not-found')){
-      msg='Email tidak terdaftar.';
-    }
-
+    else if(eCode.includes('user-not-found')) msg='Email tidak terdaftar.';
     if(attempts>=MAX_ATTEMPTS){ lockOut(); btn.disabled=true; startLockoutCountdown(btn,errEl); }
     else { btn.disabled=false; btn.innerHTML='Masuk Sistem &nbsp;→'; }
     errEl.textContent=msg; errEl.classList.add('show');
@@ -5848,127 +5809,52 @@ async function loadUserList(){
       wrap.innerHTML='<div style="font-size:12px;color:var(--text-3);padding:8px 0">Belum ada pengguna.</div>';
       return;
     }
-    wrap.innerHTML='<div class="table-wrap"><table style="table-layout:auto;min-width:500px"><thead><tr>'
-      +'<th>Email</th><th>Nama</th><th>Role</th><th></th></tr></thead><tbody>'
-      +Object.entries(users).map(([u,d])=>`<tr>
-        <td style="font-size:12px">${d.email||'-'}</td>
-        <td>${d.displayName||'-'}</td>
-        <td><span class="role-badge ${ROLE_LABELS[d.role]?.cls||''}">${ROLE_LABELS[d.role]?.icon||''} ${d.role}</span></td>
-        <td style="white-space:nowrap">
-          <button class="btn btn-danger btn-sm" onclick="hapusUser('${u}','${d.email||''}')">✕ Hapus</button>
-        </td>
-      </tr>`).join('')
+    const myUid=currentUser?.uid;
+    wrap.innerHTML='<div class="table-wrap"><table style="table-layout:auto;min-width:480px"><thead><tr>'
+      +'<th>Email</th><th>Nama</th><th>Role</th><th style="text-align:center">Akses</th></tr></thead><tbody>'
+      +Object.entries(users).map(([uid,d])=>{
+        const isAdmin=d.role==='admin';
+        const isMe=uid===myUid;
+        const active=d.active!==false; // default true jika field belum ada
+        return `<tr>
+          <td style="font-size:12px">${d.email||'-'}</td>
+          <td>${d.displayName||'-'}</td>
+          <td><span class="role-badge ${ROLE_LABELS[d.role]?.cls||''}">${ROLE_LABELS[d.role]?.icon||''} ${d.role}</span></td>
+          <td style="text-align:center;white-space:nowrap">
+            ${isAdmin||isMe
+              ? `<span style="font-size:11px;color:var(--text-3)">${isAdmin?'Admin':'Saya'}</span>`
+              : `<button class="btn btn-sm ${active?'btn-danger':'btn-primary'}"
+                  onclick="toggleUserActive('${uid}',${active},'${d.email||''}')">
+                  ${active?'⊘ Nonaktifkan':'✓ Aktifkan'}
+                </button>`
+            }
+          </td>
+        </tr>`;
+      }).join('')
       +'</tbody></table></div>';
   }catch(e){
     wrap.innerHTML='<div style="font-size:12px;color:var(--danger)">Gagal memuat: '+e.message+'</div>';
   }
 }
 
-async function tambahUser(){
-  const email       = document.getElementById('new-user-email').value.trim().toLowerCase();
-  const password    = document.getElementById('new-user-pass').value.trim();
-  const role        = document.getElementById('new-user-role').value;
-  const displayName = document.getElementById('new-user-displayname').value.trim()||email;
-
-  if(!email||!password)
-    return showAlert('user-alert','danger','Email dan password harus diisi.');
-  if(password.length<6)
-    return showAlert('user-alert','danger','Password minimal 6 karakter.');
-  if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
-    return showAlert('user-alert','danger','Format email tidak valid.');
-
+async function toggleUserActive(uid, currentActive, email){
+  const aksi=currentActive?'nonaktifkan':'aktifkan';
+  if(!confirm(`${currentActive?'Nonaktifkan':'Aktifkan'} akses untuk ${email}?`)) return;
   try{
-    showAlert('user-alert','info','⏳ Membuat akun...');
-
-    // Secondary Firebase App agar tidak mengusir session admin
-    let uid;
-    let secondaryApp=null;
-    try{
-      const appName='sijuber-secondary-'+Date.now();
-      secondaryApp = firebase.initializeApp(firebaseConfig, appName);
-      const secondaryAuth = firebase.auth(secondaryApp);
-      const cred = await secondaryAuth.createUserWithEmailAndPassword(email, password);
-      uid = cred.user.uid;
-      await secondaryAuth.signOut();
-      await secondaryApp.delete();
-      secondaryApp=null;
-    }catch(authErr){
-      if(secondaryApp) await secondaryApp.delete().catch(()=>{});
-      throw authErr;
-    }
-
-    // Simpan ke DB dengan key = uid
-    await fbDb.ref(USERS_REF+'/'+uid).set({
-      email, role, displayName,
-      createdAt: Date.now(), uid
-    });
-
-    ['new-user-email','new-user-pass','new-user-displayname']
-      .forEach(id=>{const el=document.getElementById(id);if(el) el.value='';});
-
-    showAlert('user-alert','success',
-      `✅ Pengguna <strong>${displayName}</strong> (${role}) berhasil dibuat!`);
+    await fbDb.ref(USERS_REF+'/'+uid+'/active').set(!currentActive);
+    showToast(`Akses ${email} berhasil di${aksi}kan`,'success', currentActive?'⊘':'✓');
     loadUserList();
-
   }catch(e){
-    let msg='Gagal membuat pengguna: '+(e.message||e);
-    if(e.code==='auth/email-already-in-use') msg='❌ Email sudah terdaftar di Firebase Auth.';
-    if(e.code==='auth/invalid-email') msg='❌ Format email tidak valid.';
-    if(e.code==='auth/weak-password') msg='❌ Password terlalu lemah (minimal 6 karakter).';
-    showAlert('user-alert','danger',msg);
+    showToast('Gagal: '+e.message,'danger','⚠️');
   }
 }
 
+// tambahUser dihapus — pendaftaran user baru dilakukan via Setup Awal di halaman login
 
-// ── Sync akun Auth → DB ──
-async function doSyncAkun(){
-  const username    = document.getElementById('sync-username').value.trim().toLowerCase();
-  const email       = document.getElementById('sync-email').value.trim().toLowerCase();
-  const password    = document.getElementById('sync-password').value;
-  const displayName = document.getElementById('sync-displayname').value.trim()||username;
-  const role        = document.getElementById('sync-role').value;
 
-  if(!username||!email||!password)
-    return showAlert('sync-akun-alert','danger','Semua field wajib diisi.');
-  if(!/^[a-z0-9_]+$/.test(username))
-    return showAlert('sync-akun-alert','danger','Username hanya huruf kecil, angka, underscore.');
+// doSyncAkun dihapus — tidak diperlukan lagi
 
-  try{
-    showAlert('sync-akun-alert','info','⏳ Menghubungkan akun...');
-    // Login ke Firebase Auth dulu
-    const cred = await fbAuth.signInWithEmailAndPassword(email, password);
-    const uid  = cred.user.uid;
-    // Simpan data ke DB
-    await fbDb.ref(USERS_REF+'/'+username).set({
-      username, email, role, displayName,
-      createdAt: Date.now(), uid
-    });
-    showAlert('sync-akun-alert','success','✅ Akun berhasil disinkronkan! Masuk otomatis...');
-    localStorage.setItem('sijuber_setup_done','1');
-    document.getElementById('setup-trigger-btn')?.remove();
-    closeModal('modal-sync-akun');
-    // onAuthStateChanged akan handle login
-  }catch(e){
-    let msg = 'Gagal: '+(e.message||e);
-    if(e.code==='auth/wrong-password'||e.code==='auth/invalid-credential')
-      msg = '❌ Email atau password salah.';
-    if(e.code==='auth/user-not-found')
-      msg = '❌ Email belum terdaftar di Firebase Auth.';
-    showAlert('sync-akun-alert','danger',msg);
-  }
-}
-
-async function hapusUser(uid, email){
-  if(!confirm(`Hapus pengguna ${email}?`)) return;
-  try{
-    await fbDb.ref(USERS_REF+'/'+uid).remove();
-    showToast(`Pengguna ${email} dihapus dari database`,'success','🗑️');
-    // Catatan: hapus dari Firebase Auth membutuhkan Admin SDK (server-side)
-    // Dari client tidak bisa hapus akun user lain
-    showToast('Catatan: akun Auth perlu dihapus manual di Firebase Console','info','ℹ️');
-    loadUserList();
-  }catch(e){showToast('Gagal hapus: '+e.message,'danger','⚠️');}
-}
+// hapusUser dihapus — gunakan Firebase Console untuk hapus akun Auth
 
 function copyFirebaseRules(){
   const el=document.getElementById('firebase-rules-display');
@@ -5986,14 +5872,15 @@ function init(){
   if(loginEl) loginEl.style.display='none';
   if(setupEl) setupEl.style.display='none';
   ensureDefaultAdmin().then(needsSetup=>{
-    if(!needsSetup){
+    if(needsSetup){
+      // DB kosong → setup screen sudah tampil via ensureDefaultAdmin
+    } else {
       initAuth();
-      showSetupButton();
+      // Tidak tampilkan tombol setup — DB sudah punya data
     }
   }).catch((e)=>{
     console.warn('[SIJUBER] init:',e);
     if(loginEl) loginEl.style.display='flex';
-    showSetupButton();
   });
   updateLoginInfo();
 }
@@ -6052,45 +5939,7 @@ init();
   </div>
 </div>
 
-<!-- ══ MODAL: SYNC AKUN KE DB ══ -->
-<div class="modal-overlay" id="modal-sync-akun">
-  <div class="modal" style="max-width:420px">
-    <div class="modal-title">🔗 Sinkronisasi Akun ke Database</div>
-    <div class="modal-sub">Akun sudah ada di Firebase Auth tapi data belum tersimpan di database. Isi form ini untuk menghubungkannya.</div>
-    <div class="alert" id="sync-akun-alert"></div>
-    <div class="form-grid cols1" style="gap:10px">
-      <div class="form-group">
-        <label>Username yang diinginkan</label>
-        <input type="text" id="sync-username" placeholder="contoh: admin">
-      </div>
-      <div class="form-group">
-        <label>Email (yang terdaftar di Firebase Auth)</label>
-        <input type="email" id="sync-email" placeholder="email yang dipakai saat daftar">
-      </div>
-      <div class="form-group">
-        <label>Password</label>
-        <input type="password" id="sync-password" placeholder="password Firebase Auth">
-      </div>
-      <div class="form-group">
-        <label>Nama Tampilan</label>
-        <input type="text" id="sync-displayname" placeholder="Nama lengkap">
-      </div>
-      <div class="form-group">
-        <label>Role</label>
-        <select id="sync-role">
-          <option value="admin">Admin</option>
-          <option value="bendahara">Bendahara</option>
-          <option value="operator">Operator</option>
-          <option value="viewer">Viewer</option>
-        </select>
-      </div>
-    </div>
-    <div class="modal-footer">
-      <button class="btn btn-outline" onclick="closeModal('modal-sync-akun')">Batal</button>
-      <button class="btn btn-primary" onclick="doSyncAkun()">🔗 Sinkronkan Akun</button>
-    </div>
-  </div>
-</div>
+
 </body>
 </html>
 
