@@ -2605,15 +2605,40 @@ function showAlert(id,type,msg){
 }
 function emptyRow(cols,msg){return `<tr><td colspan="${cols}" class="empty-row">${msg}</td></tr>`;}
 
+function getPajakBelumLunas(items){
+  return (items||[]).filter(p=>!p.lunas).reduce((s,p)=>s+(Number(p.nominal)||0),0);
+}
+function getKasKeluarEfektif(bruto,items){
+  return Math.max(0,(Number(bruto)||0)-getPajakBelumLunas(items));
+}
+function getNominalKasEfektif(k){
+  const nominal=Number(k?.nominal)||0;
+  if(nominal>=0) return nominal;
+  if(k?.type==='keluar'){
+    const r=db.realisasi.find(x=>x.id+1===k.id);
+    if(r&&(r.jenis==='tunai'||r.jenis===undefined)){
+      return -getKasKeluarEfektif(r.bruto||Math.abs(nominal),r.pajak);
+    }
+  }
+  return nominal;
+}
+function getKasTotalsBySumber(sumber){
+  return db.kas
+    .filter(k=>!sumber||k.sumber===sumber)
+    .reduce((acc,k)=>{
+      const nominal=getNominalKasEfektif(k);
+      if(nominal>=0) acc.masuk+=nominal;
+      else acc.keluar+=Math.abs(nominal);
+      return acc;
+    },{masuk:0,keluar:0});
+}
 function getSaldoBySumber(s){
-  const m=db.kas.filter(k=>k.nominal>0&&k.sumber===s).reduce((a,k)=>a+k.nominal,0);
-  const k=db.kas.filter(k=>k.nominal<0&&k.sumber===s).reduce((a,k)=>a+Math.abs(k.nominal),0);
-  return m-k;
+  const t=getKasTotalsBySumber(s);
+  return t.masuk-t.keluar;
 }
 function getSaldoTunai(){
-  const m=db.kas.filter(k=>k.nominal>0).reduce((s,k)=>s+k.nominal,0);
-  const k=db.kas.filter(k=>k.nominal<0).reduce((s,k)=>s+Math.abs(k.nominal),0);
-  return m-k;
+  const t=getKasTotalsBySumber();
+  return t.masuk-t.keluar;
 }
 
 function miniPie(pct,color,size=60,delay=0){
@@ -3074,8 +3099,9 @@ function cekSaldo(){
   if(!bruto){warn.classList.remove('show');return;}
   const saldo=getSaldoBySumber(sk.sumberDana);
   const saldoTot=getSaldoTunai();
-  if(saldo<bruto){
-    txt.textContent=`Saldo Tunai ${sk.sumberDana} tidak mencukupi. Tersedia: ${fmt(saldo)} (Total Tunai: ${fmt(saldoTot)})`;
+  const kasKeluar=getKasKeluarEfektif(bruto,pajakItems);
+  if(saldo<kasKeluar){
+    txt.textContent=`Saldo Tunai ${sk.sumberDana} tidak mencukupi. Kebutuhan kas: ${fmt(kasKeluar)}. Tersedia: ${fmt(saldo)} (Total Tunai: ${fmt(saldoTot)})`;
     warn.classList.add('show');
   } else warn.classList.remove('show');
 }
@@ -3178,7 +3204,7 @@ function tambahPajak(){
   renderPajakList();hitungPajak();
 }
 function hapusPajakItem(id){pajakItems=pajakItems.filter(p=>p.id!==id);renderPajakList();hitungPajak();}
-function togglePajakLunas(id){const p=pajakItems.find(x=>x.id===id);if(p)p.lunas=!p.lunas;renderPajakList();}
+function togglePajakLunas(id){const p=pajakItems.find(x=>x.id===id);if(p)p.lunas=!p.lunas;renderPajakList();hitungPajak();}
 function renderPajakList(){
   const wrap=document.getElementById('pajak-list');
   const ck=document.getElementById('pajak-checklist-wrap');
@@ -3524,12 +3550,10 @@ function renderKas(){
   renderPajakHutang();
   // Stats
   const sumbs=['DD','ADD','PAD','PBH','DLL'];
-  const totalM=db.kas.filter(k=>k.nominal>0).reduce((s,k)=>s+k.nominal,0);
-  const totalK=db.kas.filter(k=>k.nominal<0).reduce((s,k)=>s+Math.abs(k.nominal),0);
-  let html=`<div class="stat-card"><div class="stat-label">🪙 Total Saldo Tunai</div><div class="stat-value-big amber">${fmtS(totalM-totalK)}</div><div class="stat-value-sub">Dicairkan ${fmtS(totalM)} · Keluar ${fmtS(totalK)}</div></div>`;
+  const totalKas=getKasTotalsBySumber();
+  let html=`<div class="stat-card"><div class="stat-label">🪙 Total Saldo Tunai</div><div class="stat-value-big amber">${fmtS(totalKas.masuk-totalKas.keluar)}</div><div class="stat-value-sub">Dicairkan ${fmtS(totalKas.masuk)} · Keluar ${fmtS(totalKas.keluar)}</div></div>`;
   sumbs.forEach(s=>{
-    const m=db.kas.filter(k=>k.nominal>0&&k.sumber===s).reduce((a,k)=>a+k.nominal,0);
-    const ke=db.kas.filter(k=>k.nominal<0&&k.sumber===s).reduce((a,k)=>a+Math.abs(k.nominal),0);
+    const {masuk:m,keluar:ke}=getKasTotalsBySumber(s);
     if(m===0&&ke===0) return;
     html+=`<div class="stat-card"><div class="stat-label">Saldo Tunai ${s} ${sumberBadge(s)}</div><div class="stat-value-big" style="font-size:22px">${fmtS(m-ke)}</div><div class="stat-value-sub">Dicairkan ${fmtS(m)}</div></div>`;
   });
@@ -3554,14 +3578,15 @@ function renderKasTable(){
   if(curKasBulan) filtered=filtered.filter(k=>getMonthKey(k.tgl)===curKasBulan);
   let run=0;
   [...filtered].sort((a,b)=>new Date(a.tgl)-new Date(b.tgl)).forEach(k=>{
-    run+=k.nominal;
+    const nominalEfektif=getNominalKasEfektif(k);
+    run+=nominalEfektif;
     const isSetor=k.type==='setor';
     tbody.innerHTML+=`<tr class="${isSetor?'setor-row':''}">
       <td>${fmtD(k.tgl)}</td>
       <td>${k.ket}${isSetor?'&nbsp;<span class="setor-badge">🏦 Setor</span>':''}</td>
       <td>${sumberBadge(k.sumber||'-')}</td>
-      <td class="mono" style="color:var(--primary)">${k.nominal>0?fmt(k.nominal):'-'}</td>
-      <td class="mono" style="color:${isSetor?'var(--purple)':'var(--danger)'}">${k.nominal<0?fmt(Math.abs(k.nominal)):'-'}</td>
+      <td class="mono" style="color:var(--primary)">${nominalEfektif>0?fmt(nominalEfektif):'-'}</td>
+      <td class="mono" style="color:${isSetor?'var(--purple)':'var(--danger)'}">${nominalEfektif<0?fmt(Math.abs(nominalEfektif)):'-'}</td>
       <td class="mono bold-td">${fmt(run)}</td>
       <td style="white-space:nowrap">${k.type==='keluar'||isSetor?
         (isSetor?`<button class="btn btn-danger btn-sm" onclick="hapusKas(${k.id})">✕</button>`:'')
@@ -3926,14 +3951,12 @@ function renderLapKas(){
   const grid=document.getElementById('lap-kas-stats');
   if(!grid) return;
   const sumbs=['DD','ADD','PAD','PBH','DLL'];
-  const totalM=db.kas.filter(k=>k.nominal>0).reduce((s,k)=>s+k.nominal,0);
-  const totalK=db.kas.filter(k=>k.nominal<0).reduce((s,k)=>s+Math.abs(k.nominal),0);
+  const totalKas=getKasTotalsBySumber();
   let html=`<div class="stat-card"><div class="stat-label">🪙 Total Saldo Tunai</div>
-    <div class="stat-value-big amber">${fmtS(totalM-totalK)}</div>
-    <div class="stat-value-sub">Dicairkan ${fmtS(totalM)} · Keluar ${fmtS(totalK)}</div></div>`;
+    <div class="stat-value-big amber">${fmtS(totalKas.masuk-totalKas.keluar)}</div>
+    <div class="stat-value-sub">Dicairkan ${fmtS(totalKas.masuk)} · Keluar ${fmtS(totalKas.keluar)}</div></div>`;
   sumbs.forEach(s=>{
-    const m=db.kas.filter(k=>k.nominal>0&&k.sumber===s).reduce((a,k)=>a+k.nominal,0);
-    const ke=db.kas.filter(k=>k.nominal<0&&k.sumber===s).reduce((a,k)=>a+Math.abs(k.nominal),0);
+    const {masuk:m,keluar:ke}=getKasTotalsBySumber(s);
     if(m===0&&ke===0) return;
     html+=`<div class="stat-card"><div class="stat-label">Saldo ${s} ${sumberBadge(s)}</div>
       <div class="stat-value-big" style="font-size:20px">${fmtS(m-ke)}</div>
@@ -4257,6 +4280,9 @@ function tambahEditPajak(){
   document.getElementById('edit-pajak-nominal').value='';
   renderEditPajakList(id);
   hitungEditNeto();
+  renderDashboard();
+  if(document.getElementById('page-kas').classList.contains('active')) renderKas();
+  if(document.getElementById('page-laporan').classList.contains('active')) renderLaporan();
   showToast('Pajak ditambahkan','success','✅');
 }
 function hapusEditPajak(realId,pajakId){
@@ -4269,7 +4295,9 @@ function hapusEditPajak(realId,pajakId){
   saveData();
   renderEditPajakList(realId);
   hitungEditNeto();
-  if(document.getElementById('page-kas').classList.contains('active')) renderPajakHutang();
+  renderDashboard();
+  if(document.getElementById('page-kas').classList.contains('active')) renderKas();
+  if(document.getElementById('page-laporan').classList.contains('active')) renderLaporan();
   showToast('Pajak dihapus','success','🗑️');
 }
 
@@ -4335,8 +4363,10 @@ function togglePajakEdit(realId,pajakId){
   if(toggle){toggle.className='toggle-switch '+(p.lunas?'on':'off');}
   const badge=row?.querySelector('.badge');
   if(badge){badge.textContent=p.lunas?'✓ Lunas':'Belum';badge.style.background=p.lunas?'#dcfce7':'';badge.style.color=p.lunas?'#16a34a':'';}
-  // Refresh pajak hutang if kas page visible
-  if(document.getElementById('page-kas').classList.contains('active')) renderPajakHutang();
+  // Refresh saldo kas karena pajak belum lunas masih tertahan sebagai kas tunai.
+  renderDashboard();
+  if(document.getElementById('page-kas').classList.contains('active')) renderKas();
+  if(document.getElementById('page-laporan').classList.contains('active')) renderLaporan();
 }
 function simpanEditReal(){
   const id=parseInt(document.getElementById('edit-real-id').value);
@@ -4610,16 +4640,14 @@ function exportLaporanPDF(){
     <div class="stats-row">
       ${(()=>{
         const sumbs=['DD','ADD','PAD','PBH','DLL'];
-        const totalM=db.kas.filter(k=>k.nominal>0).reduce((s,k)=>s+k.nominal,0);
-        const totalK=db.kas.filter(k=>k.nominal<0).reduce((s,k)=>s+Math.abs(k.nominal),0);
+        const totalKas=getKasTotalsBySumber();
         let rows=`<div class="stat-box" style="border-color:#1a5c38">
           <div class="label">Total Saldo Tunai</div>
-          <div class="val" style="color:#1a5c38">${fmt(totalM-totalK)}</div>
-          <div style="font-size:9px;color:#888;margin-top:3px">Dicairkan ${fmtS(totalM)} · Keluar ${fmtS(totalK)}</div>
+          <div class="val" style="color:#1a5c38">${fmt(totalKas.masuk-totalKas.keluar)}</div>
+          <div style="font-size:9px;color:#888;margin-top:3px">Dicairkan ${fmtS(totalKas.masuk)} · Keluar ${fmtS(totalKas.keluar)}</div>
         </div>`;
         sumbs.forEach(s=>{
-          const m=db.kas.filter(k=>k.nominal>0&&k.sumber===s).reduce((a,k)=>a+k.nominal,0);
-          const ke=db.kas.filter(k=>k.nominal<0&&k.sumber===s).reduce((a,k)=>a+Math.abs(k.nominal),0);
+          const {masuk:m,keluar:ke}=getKasTotalsBySumber(s);
           if(m===0&&ke===0) return;
           const col=SUMBER_COLORS[s]||'#6b7280';
           rows+=`<div class="stat-box" style="border-color:${col}">
@@ -5942,4 +5970,3 @@ init();
 
 </body>
 </html>
-
